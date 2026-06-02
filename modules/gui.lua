@@ -459,6 +459,78 @@ function GUI.Create()
         }
     end
 
+    -- ── Section label (visual divider with text) ──────────────────────────
+    function GUI.AddSectionLabel(parentPage, text)
+        local LabelFrame = Instance.new("Frame", parentPage)
+        LabelFrame.Size = UDim2.new(0.95, 0, 0, 24)
+        LabelFrame.BackgroundTransparency = 1
+        
+        local Line = Instance.new("Frame", LabelFrame)
+        Line.Size = UDim2.new(1, 0, 0, 1)
+        Line.Position = UDim2.new(0, 0, 0.5, 0)
+        Line.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        Line.BorderSizePixel = 0
+        
+        local Lbl = Instance.new("TextLabel", LabelFrame)
+        Lbl.Size = UDim2.new(1, -10, 1, 0)
+        Lbl.Position = UDim2.new(0, 8, 0, 0)
+        Lbl.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+        Lbl.BackgroundTransparency = 0
+        Lbl.AutomaticSize = Enum.AutomaticSize.X
+        Lbl.Text = "  " .. text .. "  "
+        Lbl.TextColor3 = Color3.fromRGB(120, 120, 120)
+        Lbl.Font = Enum.Font.GothamMedium
+        Lbl.TextSize = 11
+        Lbl.TextXAlignment = Enum.TextXAlignment.Left
+    end
+
+    -- ── Number Input (label + text box for numeric values) ────────────────
+    function GUI.AddNumberInput(parentPage, text, defaultValue, minVal, maxVal, callback)
+        local InputFrame = Instance.new("Frame", parentPage)
+        InputFrame.Size = UDim2.new(0.95, 0, 0, 40)
+        InputFrame.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
+        Instance.new("UICorner", InputFrame).CornerRadius = UDim.new(0, 6)
+
+        local Label = Instance.new("TextLabel", InputFrame)
+        Label.Size = UDim2.new(0.65, 0, 1, 0)
+        Label.Position = UDim2.new(0, 10, 0, 0)
+        Label.BackgroundTransparency = 1
+        Label.Text = text
+        Label.TextColor3 = Color3.fromRGB(230, 230, 230)
+        Label.Font = Enum.Font.GothamMedium
+        Label.TextSize = 13
+        Label.TextXAlignment = Enum.TextXAlignment.Left
+
+        local InputBox = Instance.new("TextBox", InputFrame)
+        InputBox.Size = UDim2.new(0, 68, 0, 26)
+        InputBox.Position = UDim2.new(1, -78, 0.5, -13)
+        InputBox.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+        InputBox.Text = tostring(defaultValue)
+        InputBox.TextColor3 = Color3.fromRGB(46, 204, 113)
+        InputBox.Font = Enum.Font.GothamBold
+        InputBox.TextSize = 13
+        InputBox.ClearTextOnFocus = false
+        Instance.new("UICorner", InputBox).CornerRadius = UDim.new(0, 5)
+
+        InputBox.FocusLost:Connect(function(enterPressed)
+            local num = tonumber(InputBox.Text)
+            if num then
+                if minVal then num = math.max(minVal, num) end
+                if maxVal then num = math.min(maxVal, num) end
+                InputBox.Text = tostring(num)
+                if callback then callback(num) end
+            else
+                InputBox.Text = tostring(defaultValue)
+            end
+        end)
+
+        return {
+            SetValue = function(v)
+                InputBox.Text = tostring(v)
+            end
+        }
+    end
+
     function GUI.OnExit(callback)
         OnTerminateCallback = callback
     end

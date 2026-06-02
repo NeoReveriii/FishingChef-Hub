@@ -6,6 +6,7 @@ local GUI_URL  = "https://raw.githubusercontent.com/"..USERNAME.."/"..REPO.."/ma
 local LOOP_URL = "https://raw.githubusercontent.com/"..USERNAME.."/"..REPO.."/main/modules/autoCook.lua" .. cb
 local TELE_URL = "https://raw.githubusercontent.com/"..USERNAME.."/"..REPO.."/main/modules/teleport.lua" .. cb
 local FISH_URL = "https://raw.githubusercontent.com/"..USERNAME.."/"..REPO.."/main/modules/autoFish.lua" .. cb
+local SELL_URL = "https://raw.githubusercontent.com/"..USERNAME.."/"..REPO.."/main/modules/autoSell.lua" .. cb
 
 local function fetch(url)
     local success, result = pcall(function() return game:HttpGet(url) end)
@@ -13,17 +14,19 @@ local function fetch(url)
     return loadstring(result)()
 end
 
-local UI_Module = fetch(GUI_URL)
-local Logic_Module = fetch(LOOP_URL)
+local UI_Module       = fetch(GUI_URL)
+local Logic_Module    = fetch(LOOP_URL)
 local Teleport_Module = fetch(TELE_URL)
-local Fish_Module = fetch(FISH_URL)
+local Fish_Module     = fetch(FISH_URL)
+local Sell_Module     = fetch(SELL_URL)
 
-if UI_Module and Logic_Module and Teleport_Module and Fish_Module then
+if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Module then
     -- Run layout environment setup
     local App = UI_Module.Create()
     
     -- Exact Sidebar Tab Order requested
-    local CookPage = UI_Module.AddTab("Chef Automation")
+    local CookPage     = UI_Module.AddTab("Chef Automation")
+    local SellPage     = UI_Module.AddTab("Auto Sell")
     local TeleportPage = UI_Module.AddTab("Map Teleports")
     local SettingsPage = UI_Module.AddTab("Utilities and config")
     
@@ -71,7 +74,77 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module then
     end)
     
     -------------------------------------------
-    -- TAB 2: Map Teleports
+    -- TAB 2: Auto Sell
+    -------------------------------------------
+    UI_Module.AddSectionLabel(SellPage, "Fish to Sell")
+
+    -- Multi-select dropdown – starts empty, populated by FetchAllFishTypes()
+    local sellDropdown = UI_Module.AddDropdown(
+        SellPage,
+        "Target Fish Types",
+        {"Loading..."},
+        true,  -- multiSelect
+        function(choices)
+            Sell_Module.SelectedFish = choices
+            print("[AutoSell]: Target species -> " .. table.concat(choices, ", "))
+        end
+    )
+
+    -- Shared refresh function (used on load + by button)
+    local function refreshSellFishList(btn)
+        if btn then btn.Text = "Scanning game..." end
+        task.spawn(function()
+            local types = Sell_Module.FetchAllFishTypes()
+            if #types == 0 then
+                types = {"(No fish found – try refreshing)"}
+            end
+            Sell_Module.AllFishTypes = types
+            sellDropdown.Refresh(types)
+            if btn then btn.Text = "Refresh Fish List" end
+            print("[AutoSell]: Dropdown updated with " .. #types .. " fish types.")
+        end)
+    end
+
+    -- Refresh button (same style as Chef Automation tab)
+    local SellRefreshBtn = Instance.new("TextButton", SellPage)
+    SellRefreshBtn.Size = UDim2.new(0.95, 0, 0, 30)
+    SellRefreshBtn.BackgroundColor3 = Color3.fromRGB(52, 152, 219)
+    SellRefreshBtn.Text = "Refresh Fish List"
+    SellRefreshBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    SellRefreshBtn.Font = Enum.Font.GothamMedium
+    SellRefreshBtn.TextSize = 13
+    Instance.new("UICorner", SellRefreshBtn).CornerRadius = UDim.new(0, 6)
+
+    SellRefreshBtn.MouseButton1Click:Connect(function()
+        refreshSellFishList(SellRefreshBtn)
+    end)
+
+    -- Auto-populate on load
+    refreshSellFishList(nil)
+
+    UI_Module.AddSectionLabel(SellPage, "Timer Configuration")
+
+    UI_Module.AddNumberInput(
+        SellPage,
+        "Sell Interval (seconds)",
+        10,   -- default
+        3,    -- minimum 3 s
+        3600, -- maximum 1 hour
+        function(value)
+            Sell_Module.Interval = value
+            print("[AutoSell]: Interval set to " .. value .. "s")
+        end
+    )
+
+    UI_Module.AddSectionLabel(SellPage, "Engine")
+
+    UI_Module.AddToggle(SellPage, "Enable Auto Sell Engine", function(state)
+        Sell_Module.Enabled = state
+        if state then Sell_Module.Start() else Sell_Module.Stop() end
+    end)
+
+    -------------------------------------------
+    -- TAB 3: Map Teleports
     -------------------------------------------
     local locationNames = Teleport_Module.GetLocationNames()
     
@@ -114,6 +187,7 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module then
     UI_Module.OnExit(function()
         Logic_Module.Stop()
         Fish_Module.Stop()
+        Sell_Module.Stop()
         if PortableMenu then PortableMenu.Destroy() end
     end)
     
