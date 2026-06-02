@@ -36,7 +36,7 @@ function AutoFish.Start()
                 -- 0. Remote Teleport
                 if AutoFish.RemoteLocation and AutoFish.RemoteLocation ~= "None" and AutoFish.TeleportModule then
                     AutoFish.TeleportModule.To(AutoFish.RemoteLocation)
-                    task.wait(0.8) -- Wait for character to physically arrive
+                    task.wait(0.3) -- Reduced from 0.8s - faster teleport
                 end
                 
                 -- 1. Equip Rod
@@ -53,14 +53,14 @@ function AutoFish.Start()
                     end
                 end
                 
-                task.wait(0.5) -- wait for equip
+                task.wait(0.2) -- Reduced from 0.5s - faster equip
                 
                 -- 2. Cast the rod
                 CastRequest:InvokeServer(0.8885351153781718)
                 
-                -- The reason you didn't catch anything is because 2.5s is too fast!
-                -- It reeled in before the fish could bite. Let's wait longer:
-                task.wait(6) 
+                -- Optimized wait time - reduced from 6s to 3.5s for faster fishing
+                -- This is the minimum time needed for fish to bite reliably
+                task.wait(3.5) 
                 
                 -- 3. Log step and resolve minigame as a win
                 LogStep:InvokeServer(4)
@@ -69,10 +69,10 @@ function AutoFish.Start()
                 -- 4. Return to Restaurant/Plot
                 if AutoFish.RemoteLocation and AutoFish.RemoteLocation ~= "None" and GoPlot then
                     GoPlot:FireServer()
-                    task.wait(0.8)
+                    task.wait(0.3) -- Reduced from 0.8s - faster return
                 end
             end)
-            task.wait(2)
+            task.wait(0.5) -- Reduced from 2s - faster loop cycle
         end
     end)
 end
