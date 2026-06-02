@@ -8,219 +8,108 @@ AutoSell.Interval     = 10   -- Seconds between each auto-sell cycle
 AutoSell.AllFishTypes = {}   -- Populated at runtime by FetchAllFishTypes()
 
 -- ─────────────────────────────────────────
--- Utility: recursively scan a container for
--- ModuleScripts whose name hints at fish data
+-- FetchAllFishTypes()
+-- Queries the confirmed RF path and returns
+-- every unique fish Name from the player's
+-- current inventory. Names are exact internal
+-- strings (e.g. "yellowtail_kingfish") as
+-- used by the SellFish remote.
 -- ─────────────────────────────────────────
-local function scanForFishModule(root, depth)
-    depth = depth or 0
-    if depth > 5 then return nil end
-    for _, child in ipairs(root:GetChildren()) do
-        local lname = string.lower(child.Name)
-        if child:IsA("ModuleScript") and (
-            string.find(lname, "fish") or
-            string.find(lname, "catalog") or
-            string.find(lname, "types") or
-            string.find(lname, "config") or
-            string.find(lname, "data")
-        ) then
-            return child
-        end
-        local found = scanForFishModule(child, depth + 1)
-        if found then return found end
-    end
-    return nil
-end
+function AutoSell.FetchAllFishTypes()
+    local RS = game:GetService("ReplicatedStorage")
 
--- ─────────────────────────────────────────
--- Extract fish names from whatever shape the
--- data module returns (table keyed by name,
--- array of strings, array of objects, etc.)
--- ─────────────────────────────────────────
-local function extractNamesFromData(data)
+    local ok, RequestFishData = pcall(function()
+        return RS
+            :WaitForChild("Packages", 5)
+            :WaitForChild("Knit", 5)
+            :WaitForChild("Services", 5)
+            :WaitForChild("Fish", 5)
+            :WaitForChild("RF", 5)
+            :WaitForChild("RequestFishData", 5)
+    end)
+
+    if not ok or not RequestFishData then
+        warn("[AutoSell]: Could not reach RequestFishData RF.")
+        return {}
+    end
+
+    local success, inventory = pcall(function()
+        return RequestFishData:InvokeServer()
+    end)
+
+    if not success or type(inventory) ~= "table" then
+        warn("[AutoSell]: RequestFishData returned no data.")
+        return {}
+    end
+
+    -- Collect unique fish names in the order they appear
     local names = {}
     local seen  = {}
-    if type(data) ~= "table" then return names end
-
-    for k, v in pairs(data) do
-        local candidate = nil
-        if type(v) == "string" then
-            -- { "salmon", "tuna", ... }  or  { salmon = "Salmon", ... }
-            candidate = v
-        elseif type(v) == "table" then
-            -- { { Name="salmon", ... }, ... }  or  { salmon = { DisplayName="Salmon", ... } }
-            candidate = v.Name or v.name or v.ID or v.id or
-                        v.FishName or v.fishName or (type(k) == "string" and k) or nil
-        elseif type(k) == "string" and type(v) ~= "function" then
-            -- { salmon = { ... } }
-            candidate = k
-        end
-
-        if candidate and type(candidate) == "string" then
-            local lower = string.lower(candidate)
-            if not seen[lower] and lower ~= "" then
+    for _, item in pairs(inventory) do
+        -- The game stores the internal fish type in CF or Name
+        local fishName = item.CF or item.Name
+        if fishName and type(fishName) == "string" then
+            local lower = string.lower(fishName)
+            if not seen[lower] then
                 seen[lower] = true
-                table.insert(names, candidate)
+                table.insert(names, fishName)
             end
         end
     end
 
     table.sort(names)
+    print("[AutoSell]: Discovered " .. #names .. " unique fish types from inventory.")
     return names
-end
-
--- ─────────────────────────────────────────
--- Try to call a RemoteFunction by name and
--- extract fish names from the result
--- ─────────────────────────────────────────
-local function tryRemote(rfFolder, remoteName)
-    local rf = rfFolder:FindFirstChild(remoteName)
-    if not rf then return nil end
-    local ok, result = pcall(function() return rf:InvokeServer() end)
-    if not ok or type(result) ~= "table" then return nil end
-    local names = extractNamesFromData(result)
-    if #names > 0 then
-        print("[AutoSell]: Got " .. #names .. " fish types from remote '" .. remoteName .. "'")
-        return names
-    end
-    return nil
-end
-
--- ─────────────────────────────────────────
--- FetchAllFishTypes()
---   Priority order:
---   1. Known RF names (GetFishTypes, RequestFishTypes, etc.)
---   2. Scan RS for a fish data ModuleScript → require it
---   3. Harvest unique names already in the player's inventory
---      (partial – only covers what the player has caught)
--- ─────────────────────────────────────────
-function AutoSell.FetchAllFishTypes()
-    local RS       = game:GetService("ReplicatedStorage")
-    local Packages = RS:FindFirstChild("Packages")
-    if not Packages then
-        warn("[AutoSell]: Packages not found – cannot discover fish types.")
-        return {}
-    end
-
-    local Knit     = Packages:FindFirstChild("Knit")
-    if not Knit then return {} end
-    local Services = Knit:FindFirstChild("Services")
-    if not Services then return {} end
-
-    local FishSvc = Services:FindFirstChild("Fish")
-    if not FishSvc then return {} end
-
-    local FishRF = FishSvc:FindFirstChild("RF")
-
-    -- ── Method 1: well-known RF names ───────────────────────────────────
-    if FishRF then
-        local knownRemotes = {
-            "GetFishTypes",
-            "RequestFishTypes",
-            "GetFishCatalog",
-            "RequestFishCatalog",
-            "GetAllFish",
-            "RequestAllFish",
-            "FishTypes",
-            "FishCatalog",
-            "GetFishData",
-        }
-        for _, name in ipairs(knownRemotes) do
-            local result = tryRemote(FishRF, name)
-            if result and #result > 0 then return result end
-        end
-    end
-
-    -- ── Method 2: scan RS for any fish data ModuleScript ────────────────
-    local dataSources = {
-        RS,
-        RS:FindFirstChild("FishData"),
-        RS:FindFirstChild("GameData"),
-        RS:FindFirstChild("Data"),
-        RS:FindFirstChild("Config"),
-        RS:FindFirstChild("Shared"),
-        Packages,
-    }
-    for _, source in ipairs(dataSources) do
-        if source then
-            local mod = scanForFishModule(source)
-            if mod then
-                local ok, data = pcall(function() return require(mod) end)
-                if ok and type(data) == "table" then
-                    local names = extractNamesFromData(data)
-                    if #names > 0 then
-                        print("[AutoSell]: Got " .. #names .. " fish types from module '" .. mod.Name .. "'")
-                        return names
-                    end
-                end
-            end
-        end
-    end
-
-    -- ── Method 3: mine the player's current inventory ───────────────────
-    -- This only returns fish the player already has, but it's better than
-    -- a stale hardcoded list of fictional fish names.
-    local FishRFNode = FishSvc:FindFirstChild("RF")
-    if FishRFNode then
-        local RequestFishData = FishRFNode:FindFirstChild("RequestFishData")
-        if RequestFishData then
-            local ok, inventory = pcall(function()
-                return RequestFishData:InvokeServer()
-            end)
-            if ok and type(inventory) == "table" then
-                local names = {}
-                local seen  = {}
-                for _, item in pairs(inventory) do
-                    local fishName = item.CF or item.Name
-                    if fishName then
-                        local lower = string.lower(fishName)
-                        if not seen[lower] then
-                            seen[lower] = true
-                            table.insert(names, fishName)
-                        end
-                    end
-                end
-                table.sort(names)
-                if #names > 0 then
-                    print("[AutoSell]: Discovered " .. #names .. " fish types from inventory (partial).")
-                    return names
-                end
-            end
-        end
-    end
-
-    warn("[AutoSell]: Could not discover fish types automatically. Returning empty list.")
-    return {}
 end
 
 -- ─────────────────────────────────────────
 -- Internal helpers
 -- ─────────────────────────────────────────
 local function getRemotes()
-    local RS       = game:GetService("ReplicatedStorage")
-    local Packages = RS:WaitForChild("Packages", 5)
-    if not Packages then return nil, nil end
-    local Knit     = Packages:WaitForChild("Knit", 5)
-    local Services = Knit:WaitForChild("Services", 5)
-    local FishSvc  = Services:WaitForChild("Fish", 5)
-    local FishRF   = FishSvc:WaitForChild("RF", 5)
-    local FishRE   = FishSvc:WaitForChild("RE", 5)
-    local RequestFishData = FishRF:WaitForChild("RequestFishData", 5)
-    local SellFish        = FishRE:WaitForChild("SellFish", 5)
-    return RequestFishData, SellFish
+    local RS = game:GetService("ReplicatedStorage")
+    local ok, results = pcall(function()
+        local Pkgs     = RS:WaitForChild("Packages", 5)
+        local Services = Pkgs:WaitForChild("Knit", 5):WaitForChild("Services", 5)
+        local FishSvc  = Services:WaitForChild("Fish", 5)
+        return
+            FishSvc:WaitForChild("RF", 5):WaitForChild("RequestFishData", 5),
+            FishSvc:WaitForChild("RE", 5):WaitForChild("SellFish", 5)
+    end)
+    if not ok then return nil, nil end
+    return results -- Lua multiple-return through pcall doesn't work cleanly, see below
+end
+
+-- Cleaner approach: individual pcall per remote
+local function resolveRemotes()
+    local RS = game:GetService("ReplicatedStorage")
+    local requestFishData, sellFish
+
+    pcall(function()
+        local Services = RS
+            :WaitForChild("Packages", 5)
+            :WaitForChild("Knit", 5)
+            :WaitForChild("Services", 5)
+        local FishSvc = Services:WaitForChild("Fish", 5)
+        requestFishData = FishSvc:WaitForChild("RF", 5):WaitForChild("RequestFishData", 5)
+        sellFish        = FishSvc:WaitForChild("RE", 5):WaitForChild("SellFish", 5)
+    end)
+
+    return requestFishData, sellFish
 end
 
 -- ─────────────────────────────────────────
--- Sell all matching fish in one batch call
--- Returns number of fish sold (or -1 on error)
+-- SellNow()
+-- Fetches inventory, filters by selected
+-- fish types, skips favorites, fires one
+-- batch SellFish call.
 -- ─────────────────────────────────────────
 function AutoSell.SellNow()
-    local RequestFishData, SellFish = getRemotes()
+    local RequestFishData, SellFish = resolveRemotes()
     if not (RequestFishData and SellFish) then
         warn("[AutoSell]: Could not reach Fish remotes.")
         return -1
     end
 
-    -- Fetch live inventory
     local ok, inventory = pcall(function()
         return RequestFishData:InvokeServer()
     end)
@@ -229,7 +118,7 @@ function AutoSell.SellNow()
         return -1
     end
 
-    -- Build selection set for quick lookup
+    -- Build lookup set from selected fish
     local sellSet = {}
     local sellAll = (#AutoSell.SelectedFish == 0)
     if not sellAll then
@@ -238,7 +127,7 @@ function AutoSell.SellNow()
         end
     end
 
-    -- Filter – skip favorites, only include selected fish types
+    -- Build sell batch — skip favorites
     local batch = {}
     for _, item in pairs(inventory) do
         if item.Favorite then continue end
@@ -257,11 +146,10 @@ function AutoSell.SellNow()
     end
 
     if #batch == 0 then
-        print("[AutoSell]: No matching fish to sell (or all are favorited).")
+        print("[AutoSell]: Nothing to sell (empty match or all favorited).")
         return 0
     end
 
-    -- Fire SellFish remote with the batch payload
     local sellOk, sellErr = pcall(function()
         SellFish:FireServer(batch)
     end)
@@ -270,7 +158,7 @@ function AutoSell.SellNow()
         print("[AutoSell]: Sold " .. #batch .. " fish.")
         return #batch
     else
-        warn("[AutoSell]: SellFish remote error – " .. tostring(sellErr))
+        warn("[AutoSell]: SellFish error – " .. tostring(sellErr))
         return -1
     end
 end
@@ -280,11 +168,12 @@ end
 -- ─────────────────────────────────────────
 function AutoSell.Start()
     if loopThread then task.cancel(loopThread) end
-    print("[AutoSell]: Thread initialized. Interval = " .. AutoSell.Interval .. "s")
+    print("[AutoSell]: Started. Interval = " .. AutoSell.Interval .. "s")
 
     loopThread = task.spawn(function()
         while AutoSell.Enabled do
             AutoSell.SellNow()
+            -- 1-second tick so interval changes apply without restart
             local waited = 0
             while AutoSell.Enabled and waited < AutoSell.Interval do
                 task.wait(1)
@@ -300,7 +189,7 @@ function AutoSell.Stop()
         task.cancel(loopThread)
         loopThread = nil
     end
-    print("[AutoSell]: Thread terminated.")
+    print("[AutoSell]: Stopped.")
 end
 
 return AutoSell
