@@ -3,7 +3,8 @@ local loopThread = nil
 
 -- Shared Configuration States
 AutoCook.Enabled = false
-AutoCook.SelectedFish = "great_white_shark" -- Target fish for Sashimi
+AutoCook.SelectedFishes = {} -- Array of target fish for processing
+AutoCook.SelectedRecipe = "Sashimi" -- Default selected recipe
 
 -- 🛠️ Request inventory directly to generate our dynamic UI dropdown
 function AutoCook.GetAvailableFish()
@@ -87,25 +88,33 @@ function AutoCook.Start()
         local ServerAnims = FishRE:WaitForChild("ServerAnims")
         
         while AutoCook.Enabled do
-            if AutoCook.SelectedFish then
+            if AutoCook.SelectedFishes and #AutoCook.SelectedFishes > 0 then
                 -- Step 1: Request inventory payload
                 local success, inventory = pcall(function()
                     return RequestFishData:InvokeServer()
                 end)
                 
                 local targetFishItem = nil
+                local targetFishName = nil
+                
                 if success and inventory then
-                    -- Step 2: Match selection item by CF or Name
+                    -- Step 2: Match selection item against any of the selected fishes array
                     for _, item in pairs(inventory) do
-                        if (item.CF and string.lower(item.CF) == string.lower(AutoCook.SelectedFish)) or (item.Name and string.lower(item.Name) == string.lower(AutoCook.SelectedFish)) then
-                            targetFishItem = item
-                            break
+                        local matchFound = false
+                        for _, fishTarget in ipairs(AutoCook.SelectedFishes) do
+                            if (item.CF and string.lower(item.CF) == string.lower(fishTarget)) or (item.Name and string.lower(item.Name) == string.lower(fishTarget)) then
+                                targetFishItem = item
+                                targetFishName = fishTarget
+                                matchFound = true
+                                break
+                            end
                         end
+                        if matchFound then break end
                     end
                 end
                 
                 if targetFishItem then
-                    print("🔥 AutoCook System: Processing Sashimi -> " .. tostring(AutoCook.SelectedFish))
+                    print("🔥 AutoCook System: Processing " .. tostring(AutoCook.SelectedRecipe) .. " -> " .. tostring(targetFishName))
                     
                     -- Step 3: Execute the sequence in an isolated pcall to prevent thread crashing
                     pcall(function()
@@ -146,9 +155,9 @@ function AutoCook.Start()
                         RequestRestaurantData:InvokeServer()
                         task.wait(0.2)
                         
-                        -- 3.7: Cook Sashimi
+                        -- 3.7: Cook Process
                         local cookPayload = {
-                            CF = targetFishItem.CF or AutoCook.SelectedFish,
+                            CF = targetFishItem.CF or targetFishName,
                             Name = "Fish Filet",
                             Amount = 1,
                             ID = targetFishItem.ID or 15,
@@ -156,8 +165,8 @@ function AutoCook.Start()
                             Value = 0
                         }
                         
-                        Cook:InvokeServer("Sashimi", cookPayload, floatVal)
-                        print("✅ AutoCook System: Successfully cooked Sashimi!")
+                        Cook:InvokeServer(AutoCook.SelectedRecipe, cookPayload, floatVal)
+                        print("✅ AutoCook System: Successfully cooked " .. tostring(AutoCook.SelectedRecipe) .. "!")
                     end)
                     
                     task.wait(2) -- Wait before cooking next fish

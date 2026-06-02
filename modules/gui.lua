@@ -19,6 +19,25 @@ function GUI.Create()
     
     Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
     
+    -- Pocket Mode Anchor
+    local MaximizeAnchor = Instance.new("TextButton")
+    MaximizeAnchor.Name = "MaximizeAnchor"
+    MaximizeAnchor.Size = UDim2.new(0, 50, 0, 50)
+    MaximizeAnchor.Position = UDim2.new(1, -70, 1, -70)
+    MaximizeAnchor.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
+    MaximizeAnchor.Text = "🍳"
+    MaximizeAnchor.TextSize = 24
+    MaximizeAnchor.Visible = false
+    MaximizeAnchor.Active = true
+    MaximizeAnchor.Draggable = true
+    MaximizeAnchor.Parent = ScreenGui
+    Instance.new("UICorner", MaximizeAnchor).CornerRadius = UDim.new(1, 0)
+    
+    MaximizeAnchor.MouseButton1Click:Connect(function()
+        MaximizeAnchor.Visible = false
+        MainFrame.Visible = true
+    end)
+    
     local Sidebar = Instance.new("Frame", MainFrame)
     Sidebar.Name = "Sidebar"
     Sidebar.Size = UDim2.new(0, 160, 1, 0)
@@ -69,6 +88,21 @@ function GUI.Create()
     ExitButton.TextSize = 18
     Instance.new("UICorner", ExitButton).CornerRadius = UDim.new(0, 6)
 
+    local MinimizeButton = Instance.new("TextButton", MainFrame)
+    MinimizeButton.Size = UDim2.new(0, 24, 0, 24)
+    MinimizeButton.Position = UDim2.new(1, -64, 0, 10)
+    MinimizeButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    MinimizeButton.Text = "-"
+    MinimizeButton.TextColor3 = Color3.fromRGB(150, 150, 150)
+    MinimizeButton.Font = Enum.Font.GothamMedium
+    MinimizeButton.TextSize = 18
+    Instance.new("UICorner", MinimizeButton).CornerRadius = UDim.new(0, 6)
+    
+    MinimizeButton.MouseButton1Click:Connect(function()
+        MainFrame.Visible = false
+        MaximizeAnchor.Visible = true
+    end)
+
     local CurrentActiveTab = nil
     local OnTerminateCallback = nil
     
@@ -118,7 +152,6 @@ function GUI.Create()
         return PageFrame
     end
 
-    -- 🛠️ UI COMPONENT: SWITCH TOGGLE
     function GUI.AddToggle(parentPage, text, callback)
         local ToggleFrame = Instance.new("Frame", parentPage)
         ToggleFrame.Size = UDim2.new(0.95, 0, 0, 40)
@@ -161,13 +194,11 @@ function GUI.Create()
         end)
     end
 
-    -- 🛠️ UPGRADED UI COMPONENT: FLOATING OVERLAY DROPDOWN (Matches image_4a7bdd.png)
-    function GUI.AddDropdown(parentPage, text, listOptions, callback)
+    function GUI.AddDropdown(parentPage, text, listOptions, multiSelect, callback)
         local DropdownFrame = Instance.new("Frame", parentPage)
         DropdownFrame.Size = UDim2.new(0.95, 0, 0, 45)
         DropdownFrame.BackgroundTransparency = 1
         
-        -- Left Label Text Description
         local Label = Instance.new("TextLabel", DropdownFrame)
         Label.Size = UDim2.new(0.5, -10, 1, 0)
         Label.Position = UDim2.new(0, 10, 0, 0)
@@ -178,7 +209,6 @@ function GUI.Create()
         Label.TextSize = 13
         Label.TextXAlignment = Enum.TextXAlignment.Left
         
-        -- Right Selection Display Box Container
         local MainBtn = Instance.new("TextButton", DropdownFrame)
         MainBtn.Size = UDim2.new(0.5, 0, 0.8, 0)
         MainBtn.Position = UDim2.new(0.5, 0, 0.1, 0)
@@ -187,16 +217,16 @@ function GUI.Create()
         MainBtn.TextColor3 = Color3.fromRGB(160, 160, 160)
         MainBtn.Font = Enum.Font.GothamMedium
         MainBtn.TextSize = 12
+        MainBtn.TextTruncate = Enum.TextTruncate.AtEnd
         Instance.new("UICorner", MainBtn).CornerRadius = UDim.new(0, 6)
         
-        -- Generate Floating Menu List Portal Layer
         local FloatingList = Instance.new("Frame")
         FloatingList.Name = "FloatingDropdown"
         FloatingList.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
         FloatingList.BorderSizePixel = 0
-        FloatingList.ZIndex = 100 -- Places it absolutely on top of everything
+        FloatingList.ZIndex = 100 
         FloatingList.Visible = false
-        FloatingList.Parent = ScreenGui -- Attach directly to top screen engine hierarchy
+        FloatingList.Parent = ScreenGui 
         
         Instance.new("UICorner", FloatingList).CornerRadius = UDim.new(0, 6)
         local Stroke = Instance.new("UIStroke", FloatingList)
@@ -206,47 +236,99 @@ function GUI.Create()
         local ListScroll = Instance.new("ScrollingFrame", FloatingList)
         ListScroll.Size = UDim2.new(1, 0, 1, 0)
         ListScroll.BackgroundTransparency = 1
-        ListScroll.ScrollBarThickness = 0
+        ListScroll.ScrollBarThickness = 4
+        ListScroll.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
         ListScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
         
         local listLayout = Instance.new("UIListLayout", ListScroll)
         listLayout.Padding = UDim.new(0, 2)
         listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
         
-        -- Populate elements inside overlay panel container
-        for _, option in ipairs(listOptions) do
-            local OptBtn = Instance.new("TextButton", ListScroll)
-            OptBtn.Size = UDim2.new(0.95, 0, 0, 30)
-            OptBtn.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
-            OptBtn.BorderSizePixel = 0
-            OptBtn.Text = "  " .. option
-            OptBtn.TextColor3 = Color3.fromRGB(160, 160, 160)
-            OptBtn.Font = Enum.Font.GothamMedium
-            OptBtn.TextSize = 12
-            OptBtn.TextXAlignment = Enum.TextXAlignment.Left
-            OptBtn.ZIndex = 101
-            Instance.new("UICorner", OptBtn).CornerRadius = UDim.new(0, 4)
-            
-            -- Simple hover aesthetics
-            OptBtn.MouseEnter:Connect(function() OptBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30) end)
-            OptBtn.MouseLeave:Connect(function() OptBtn.BackgroundColor3 = Color3.fromRGB(22, 22, 22) end)
-            
-            OptBtn.MouseButton1Click:Connect(function()
-                MainBtn.Text = option .. "  ↕"
-                FloatingList.Visible = false
-                if callback then callback(option) end
-            end)
+        local selectedItems = {}
+        
+        local function UpdateMainText()
+            if not multiSelect then return end
+            local keys = {}
+            for k, v in pairs(selectedItems) do 
+                if v then table.insert(keys, k) end 
+            end
+            if #keys > 0 then
+                MainBtn.Text = table.concat(keys, ", ") .. "  ↕"
+            else
+                MainBtn.Text = "Select...  ↕"
+            end
         end
         
-        -- Coordinate recalculation execution logic
+        local function populate(options)
+            for _, child in ipairs(ListScroll:GetChildren()) do
+                if child:IsA("TextButton") then
+                    child:Destroy()
+                end
+            end
+            
+            for _, option in ipairs(options) do
+                local OptBtn = Instance.new("TextButton", ListScroll)
+                OptBtn.Size = UDim2.new(0.95, 0, 0, 30)
+                OptBtn.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
+                OptBtn.BorderSizePixel = 0
+                OptBtn.Text = "  " .. tostring(option)
+                OptBtn.TextColor3 = Color3.fromRGB(160, 160, 160)
+                OptBtn.Font = Enum.Font.GothamMedium
+                OptBtn.TextSize = 12
+                OptBtn.TextXAlignment = Enum.TextXAlignment.Left
+                OptBtn.ZIndex = 101
+                Instance.new("UICorner", OptBtn).CornerRadius = UDim.new(0, 4)
+                
+                -- Restore visual state if previously selected
+                if multiSelect and selectedItems[option] then
+                    OptBtn.TextColor3 = Color3.fromRGB(46, 204, 113)
+                    OptBtn.Text = "✓ " .. tostring(option)
+                end
+                
+                OptBtn.MouseEnter:Connect(function() OptBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30) end)
+                OptBtn.MouseLeave:Connect(function() OptBtn.BackgroundColor3 = Color3.fromRGB(22, 22, 22) end)
+                
+                OptBtn.MouseButton1Click:Connect(function()
+                    if multiSelect then
+                        selectedItems[option] = not selectedItems[option]
+                        if selectedItems[option] then
+                            OptBtn.TextColor3 = Color3.fromRGB(46, 204, 113)
+                            OptBtn.Text = "✓ " .. tostring(option)
+                        else
+                            OptBtn.TextColor3 = Color3.fromRGB(160, 160, 160)
+                            OptBtn.Text = "  " .. tostring(option)
+                        end
+                        UpdateMainText()
+                        
+                        local activeKeys = {}
+                        for k, v in pairs(selectedItems) do if v then table.insert(activeKeys, k) end end
+                        if callback then callback(activeKeys) end
+                    else
+                        MainBtn.Text = tostring(option) .. "  ↕"
+                        FloatingList.Visible = false
+                        if callback then callback(option) end
+                    end
+                end)
+            end
+            
+            -- Adjust canvas size for scrolling
+            ListScroll.CanvasSize = UDim2.new(0, 0, 0, #options * 32)
+        end
+        
+        populate(listOptions)
+        
         local open = false
+        local posTracker = nil
+        
         MainBtn.MouseButton1Click:Connect(function()
             open = not open
             if open then
-                local btnAbsolutePos = MainBtn.AbsolutePosition
-                FloatingList.Position = UDim2.new(0, btnAbsolutePos.X, 0, btnAbsolutePos.Y + MainBtn.AbsoluteSize.Y + 4)
+                local function syncPos()
+                    local btnAbsolutePos = MainBtn.AbsolutePosition
+                    FloatingList.Position = UDim2.new(0, btnAbsolutePos.X, 0, btnAbsolutePos.Y + MainBtn.AbsoluteSize.Y + 4)
+                end
+                syncPos()
                 
-                -- Count options for size
                 local optionCount = 0
                 for _, child in ipairs(ListScroll:GetChildren()) do
                     if child:IsA("TextButton") then optionCount = optionCount + 1 end
@@ -254,44 +336,18 @@ function GUI.Create()
                 
                 FloatingList.Size = UDim2.new(0, MainBtn.AbsoluteSize.X, 0, math.min(optionCount * 32 + 4, 150))
                 FloatingList.Visible = true
+                
+                if posTracker then posTracker:Disconnect() end
+                posTracker = MainFrame:GetPropertyChangedSignal("AbsolutePosition"):Connect(syncPos)
             else
                 FloatingList.Visible = false
+                if posTracker then posTracker:Disconnect(); posTracker = nil end
             end
         end)
         
-        -- Return a table with a Refresh function
         return {
             Refresh = function(newOptions)
-                -- Clear old options
-                for _, child in ipairs(ListScroll:GetChildren()) do
-                    if child:IsA("TextButton") then
-                        child:Destroy()
-                    end
-                end
-                
-                -- Repopulate
-                for _, option in ipairs(newOptions) do
-                    local OptBtn = Instance.new("TextButton", ListScroll)
-                    OptBtn.Size = UDim2.new(0.95, 0, 0, 30)
-                    OptBtn.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
-                    OptBtn.BorderSizePixel = 0
-                    OptBtn.Text = "  " .. tostring(option)
-                    OptBtn.TextColor3 = Color3.fromRGB(160, 160, 160)
-                    OptBtn.Font = Enum.Font.GothamMedium
-                    OptBtn.TextSize = 12
-                    OptBtn.TextXAlignment = Enum.TextXAlignment.Left
-                    OptBtn.ZIndex = 101
-                    Instance.new("UICorner", OptBtn).CornerRadius = UDim.new(0, 4)
-                    
-                    OptBtn.MouseEnter:Connect(function() OptBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30) end)
-                    OptBtn.MouseLeave:Connect(function() OptBtn.BackgroundColor3 = Color3.fromRGB(22, 22, 22) end)
-                    
-                    OptBtn.MouseButton1Click:Connect(function()
-                        MainBtn.Text = tostring(option) .. "  ↕"
-                        FloatingList.Visible = false
-                        if callback then callback(option) end
-                    end)
-                end
+                populate(newOptions)
             end
         }
     end

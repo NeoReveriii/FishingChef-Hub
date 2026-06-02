@@ -20,10 +20,16 @@ if UI_Module and Logic_Module then
     local CookPage = UI_Module.AddTab("Chef Automation")
     local SettingsPage = UI_Module.AddTab("Utilities & Config")
     
-    -- Sync dropdown choice to backend configuration data state
-    local dropdownController = UI_Module.AddDropdown(CookPage, "Target Species Selection", {"Loading..."}, function(choice)
-        Logic_Module.SelectedFish = choice
-        print("🎯 State Change: Set target species value to -> " .. choice)
+    -- Target Recipe Cuisine (Single-Select)
+    UI_Module.AddDropdown(CookPage, "Target Recipe Cuisine", {"Sashimi"}, false, function(choice)
+        Logic_Module.SelectedRecipe = choice
+        print("🍽️ State Change: Set target recipe to -> " .. choice)
+    end)
+    
+    -- Sync dropdown choice to backend configuration data state (Multi-Select)
+    local dropdownController = UI_Module.AddDropdown(CookPage, "Target Species Selection", {"Loading..."}, true, function(choices)
+        Logic_Module.SelectedFishes = choices
+        print("🎯 State Change: Set target species to -> " .. table.concat(choices, ", "))
     end)
     
     -- Refresh button to fetch inventory and update dropdown
