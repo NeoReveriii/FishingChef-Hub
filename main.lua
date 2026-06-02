@@ -2,7 +2,6 @@ local USERNAME = "NeoReveriii"
 local REPO     = "FishingChef-Hub"
 local cb       = "?cache=" .. math.random(1, 99999)
 
--- Bypasses the cache for the submodules too!
 local GUI_URL = "https://raw.githubusercontent.com/"..USERNAME.."/"..REPO.."/main/modules/gui.lua" .. cb
 
 local function fetch(url)
@@ -13,7 +12,9 @@ end
 
 local UI_Module = fetch(GUI_URL)
 if UI_Module then
+    -- 🛠️ FIX: We need to explicitly handle the ScreenGui parent container connection
     local App = UI_Module.Create()
+    
     local CookPage = UI_Module.AddTab("Chef Automation")
     local SettingsPage = UI_Module.AddTab("Utilities & Config")
     
@@ -25,4 +26,8 @@ if UI_Module then
     UI_Module.AddToggle(CookPage, "Enable AutoCook Engine Loop", function(state)
         print("⚙️ Toggle State: " .. tostring(state))
     end)
+    
+    print("🚀 [Main Launch]: Interface fully configured and rendering live!")
+else
+    warn("❌ Main script downloaded but couldn't load gui.lua sub-module link.")
 end
