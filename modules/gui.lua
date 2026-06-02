@@ -345,9 +345,107 @@ function GUI.Create()
             end
         end)
         
+        -- Return a table with a Refresh function
         return {
             Refresh = function(newOptions)
                 populate(newOptions)
+            end
+        }
+    end
+
+    function GUI.CreatePortableDropdown(title, listOptions, callback)
+        local PortableFrame = Instance.new("Frame")
+        PortableFrame.Name = "PortableTeleportMenu"
+        PortableFrame.Size = UDim2.new(0, 160, 0, 45)
+        PortableFrame.Position = UDim2.new(0.5, 0, 0.1, 0)
+        PortableFrame.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
+        PortableFrame.Active = true
+        PortableFrame.Draggable = true
+        PortableFrame.Parent = ScreenGui
+        Instance.new("UICorner", PortableFrame).CornerRadius = UDim.new(0, 6)
+        
+        local MainBtn = Instance.new("TextButton", PortableFrame)
+        MainBtn.Size = UDim2.new(1, 0, 1, 0)
+        MainBtn.BackgroundTransparency = 1
+        MainBtn.Text = title .. "  ↕"
+        MainBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+        MainBtn.Font = Enum.Font.GothamMedium
+        MainBtn.TextSize = 13
+        
+        local FloatingList = Instance.new("Frame")
+        FloatingList.Name = "PortableFloatingDropdown"
+        FloatingList.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
+        FloatingList.BorderSizePixel = 0
+        FloatingList.ZIndex = 100 
+        FloatingList.Visible = false
+        FloatingList.Parent = ScreenGui 
+        
+        Instance.new("UICorner", FloatingList).CornerRadius = UDim.new(0, 6)
+        local Stroke = Instance.new("UIStroke", FloatingList)
+        Stroke.Color = Color3.fromRGB(35, 35, 35)
+        Stroke.Thickness = 1
+        
+        local ListScroll = Instance.new("ScrollingFrame", FloatingList)
+        ListScroll.Size = UDim2.new(1, 0, 1, 0)
+        ListScroll.BackgroundTransparency = 1
+        ListScroll.ScrollBarThickness = 4
+        ListScroll.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
+        ListScroll.CanvasSize = UDim2.new(0, 0, 0, #listOptions * 32)
+        
+        local listLayout = Instance.new("UIListLayout", ListScroll)
+        listLayout.Padding = UDim.new(0, 2)
+        listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+        
+        for _, option in ipairs(listOptions) do
+            local OptBtn = Instance.new("TextButton", ListScroll)
+            OptBtn.Size = UDim2.new(0.95, 0, 0, 30)
+            OptBtn.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
+            OptBtn.BorderSizePixel = 0
+            OptBtn.Text = "  " .. option
+            OptBtn.TextColor3 = Color3.fromRGB(160, 160, 160)
+            OptBtn.Font = Enum.Font.GothamMedium
+            OptBtn.TextSize = 12
+            OptBtn.TextXAlignment = Enum.TextXAlignment.Left
+            OptBtn.ZIndex = 101
+            Instance.new("UICorner", OptBtn).CornerRadius = UDim.new(0, 4)
+            
+            OptBtn.MouseEnter:Connect(function() OptBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30) end)
+            OptBtn.MouseLeave:Connect(function() OptBtn.BackgroundColor3 = Color3.fromRGB(22, 22, 22) end)
+            
+            OptBtn.MouseButton1Click:Connect(function()
+                FloatingList.Visible = false
+                if callback then callback(option) end
+            end)
+        end
+        
+        local open = false
+        local posTracker = nil
+        
+        MainBtn.MouseButton1Click:Connect(function()
+            open = not open
+            if open then
+                local function syncPos()
+                    local btnAbsolutePos = MainBtn.AbsolutePosition
+                    FloatingList.Position = UDim2.new(0, btnAbsolutePos.X, 0, btnAbsolutePos.Y + MainBtn.AbsoluteSize.Y + 4)
+                end
+                syncPos()
+                
+                FloatingList.Size = UDim2.new(0, MainBtn.AbsoluteSize.X, 0, math.min(#listOptions * 32 + 4, 150))
+                FloatingList.Visible = true
+                
+                if posTracker then posTracker:Disconnect() end
+                posTracker = PortableFrame:GetPropertyChangedSignal("AbsolutePosition"):Connect(syncPos)
+            else
+                FloatingList.Visible = false
+                if posTracker then posTracker:Disconnect(); posTracker = nil end
+            end
+        end)
+        
+        return {
+            Destroy = function()
+                if posTracker then posTracker:Disconnect() end
+                FloatingList:Destroy()
+                PortableFrame:Destroy()
             end
         }
     end
