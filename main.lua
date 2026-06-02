@@ -30,12 +30,12 @@ if UI_Module and Logic_Module and Teleport_Module then
     -------------------------------------------
     UI_Module.AddDropdown(CookPage, "Target Recipe Cuisine", {"Sashimi"}, false, function(choice)
         Logic_Module.SelectedRecipe = choice
-        print("🍽️ State Change: Set target recipe to -> " .. choice)
+        print("[State]: Set target recipe to -> " .. choice)
     end)
     
     local dropdownController = UI_Module.AddDropdown(CookPage, "Target Species Selection", {"Loading..."}, true, function(choices)
         Logic_Module.SelectedFishes = choices
-        print("🎯 State Change: Set target species to -> " .. table.concat(choices, ", "))
+        print("[State]: Set target species to -> " .. table.concat(choices, ", "))
     end)
     
     local RefreshBtn = Instance.new("TextButton", CookPage)
@@ -80,7 +80,7 @@ if UI_Module and Logic_Module and Teleport_Module then
     local PortableMenu = nil
     UI_Module.AddToggle(TeleportPage, "Enable Portable Teleport Menu", function(state)
         if state then
-            PortableMenu = UI_Module.CreatePortableDropdown("📍 Teleport", locationNames, function(choice)
+            PortableMenu = UI_Module.CreatePortableDropdown("Teleport", locationNames, function(choice)
                 Teleport_Module.To(choice)
             end)
         else
@@ -99,7 +99,7 @@ if UI_Module and Logic_Module and Teleport_Module then
         if PortableMenu then PortableMenu.Destroy() end
     end)
     
-    print("🚀 [Success]: Hub fully connected to background Knit tracking automation loop.")
+    print("[Success]: Hub fully connected to background Knit tracking automation loop.")
 else
-    warn("❌ [Error]: Script initialization aborted. Check file paths. Ensure all modules are pushed to GitHub!")
+    warn("[Error]: Script initialization aborted. Check file paths. Ensure all modules are pushed to GitHub!")
 end

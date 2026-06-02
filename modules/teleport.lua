@@ -22,11 +22,11 @@ function Teleport.To(locationName)
             -- Target CFrame with +3.0 Y Safety Padding
             local targetCFrame = CFrame.new(pos.X, pos.Y + 3.0, pos.Z)
             LocalPlayer.Character.HumanoidRootPart.CFrame = targetCFrame
-            print("📍 Teleported safely to: " .. locationName)
+            print("[Teleport]: Safely teleported to: " .. locationName)
             return true
         end
     else
-        warn("⚠️ Teleport Error: Location '" .. tostring(locationName) .. "' not found.")
+        warn("[Teleport Error]: Location '" .. tostring(locationName) .. "' not found.")
     end
     return false
 end

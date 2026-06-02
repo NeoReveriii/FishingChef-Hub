@@ -25,8 +25,8 @@ function GUI.Create()
     MaximizeAnchor.Size = UDim2.new(0, 50, 0, 50)
     MaximizeAnchor.Position = UDim2.new(1, -70, 1, -70)
     MaximizeAnchor.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
-    MaximizeAnchor.Text = "🍳"
-    MaximizeAnchor.TextSize = 24
+    MaximizeAnchor.Text = "Hub"
+    MaximizeAnchor.TextSize = 14
     MaximizeAnchor.Visible = false
     MaximizeAnchor.Active = true
     MaximizeAnchor.Draggable = true
@@ -282,7 +282,7 @@ function GUI.Create()
                 -- Restore visual state if previously selected
                 if multiSelect and selectedItems[option] then
                     OptBtn.TextColor3 = Color3.fromRGB(46, 204, 113)
-                    OptBtn.Text = "✓ " .. tostring(option)
+                    OptBtn.Text = "[x] " .. tostring(option)
                 end
                 
                 OptBtn.MouseEnter:Connect(function() OptBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30) end)
@@ -293,7 +293,7 @@ function GUI.Create()
                         selectedItems[option] = not selectedItems[option]
                         if selectedItems[option] then
                             OptBtn.TextColor3 = Color3.fromRGB(46, 204, 113)
-                            OptBtn.Text = "✓ " .. tostring(option)
+                            OptBtn.Text = "[x] " .. tostring(option)
                         else
                             OptBtn.TextColor3 = Color3.fromRGB(160, 160, 160)
                             OptBtn.Text = "  " .. tostring(option)
@@ -364,8 +364,17 @@ function GUI.Create()
         PortableFrame.Parent = ScreenGui
         Instance.new("UICorner", PortableFrame).CornerRadius = UDim.new(0, 6)
         
+        local DragHandle = Instance.new("TextLabel", PortableFrame)
+        DragHandle.Size = UDim2.new(0, 30, 1, 0)
+        DragHandle.BackgroundTransparency = 1
+        DragHandle.Text = "≡"
+        DragHandle.TextColor3 = Color3.fromRGB(150, 150, 150)
+        DragHandle.Font = Enum.Font.GothamMedium
+        DragHandle.TextSize = 18
+        
         local MainBtn = Instance.new("TextButton", PortableFrame)
-        MainBtn.Size = UDim2.new(1, 0, 1, 0)
+        MainBtn.Size = UDim2.new(1, -30, 1, 0)
+        MainBtn.Position = UDim2.new(0, 30, 0, 0)
         MainBtn.BackgroundTransparency = 1
         MainBtn.Text = title .. "  ↕"
         MainBtn.TextColor3 = Color3.fromRGB(200, 200, 200)

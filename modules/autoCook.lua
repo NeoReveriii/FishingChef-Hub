@@ -49,7 +49,7 @@ end
 -- Background Task Execution Core Loop
 function AutoCook.Start()
     if loopThread then task.cancel(loopThread) end
-    print("🍳 AutoCook System: Thread initialized safely.")
+    print("[AutoCook]: Thread initialized safely.")
     
     loopThread = task.spawn(function()
         -- 🛠️ Safely retrieve services INSIDE the background thread to prevent UI freezing
@@ -59,7 +59,7 @@ function AutoCook.Start()
         
         local Packages = ReplicatedStorage:WaitForChild("Packages", 5)
         if not Packages then
-            warn("🚨 AutoCook Error: 'Packages' was not found in ReplicatedStorage.")
+            warn("[AutoCook Error]: 'Packages' was not found in ReplicatedStorage.")
             AutoCook.Enabled = false
             return
         end
@@ -114,7 +114,7 @@ function AutoCook.Start()
                 end
                 
                 if targetFishItem then
-                    print("🔥 AutoCook System: Processing " .. tostring(AutoCook.SelectedRecipe) .. " -> " .. tostring(targetFishName))
+                    print("[AutoCook]: Processing " .. tostring(AutoCook.SelectedRecipe) .. " -> " .. tostring(targetFishName))
                     
                     -- Step 3: Execute the sequence in an isolated pcall to prevent thread crashing
                     pcall(function()
@@ -166,7 +166,25 @@ function AutoCook.Start()
                         }
                         
                         Cook:InvokeServer(AutoCook.SelectedRecipe, cookPayload, floatVal)
-                        print("✅ AutoCook System: Successfully cooked " .. tostring(AutoCook.SelectedRecipe) .. "!")
+                        print("[AutoCook]: Successfully cooked " .. tostring(AutoCook.SelectedRecipe) .. "!")
+                        
+                        task.spawn(function()
+                            task.wait(0.5)
+                            local char = LocalPlayer.Character
+                            if char then
+                                local humanoid = char:FindFirstChild("Humanoid")
+                                if humanoid then
+                                    humanoid:UnequipTools()
+                                    task.wait(0.1)
+                                    for _, tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
+                                        if tool:IsA("Tool") and string.find(string.lower(tool.Name), "rod") then
+                                            humanoid:EquipTool(tool)
+                                            break
+                                        end
+                                    end
+                                end
+                            end
+                        end)
                     end)
                     
                     task.wait(2) -- Wait before cooking next fish
@@ -186,7 +204,7 @@ function AutoCook.Stop()
         task.cancel(loopThread)
         loopThread = nil
     end
-    print("🛑 AutoCook System: Thread cleanly terminated.")
+    print("[AutoCook]: Thread cleanly terminated.")
 end
 
 return AutoCook
