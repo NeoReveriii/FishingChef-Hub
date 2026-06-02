@@ -5,6 +5,7 @@ local cb       = "?nocache=" .. math.random(11111, 99999)
 local GUI_URL  = "https://raw.githubusercontent.com/"..USERNAME.."/"..REPO.."/main/modules/gui.lua" .. cb
 local LOOP_URL = "https://raw.githubusercontent.com/"..USERNAME.."/"..REPO.."/main/modules/autoCook.lua" .. cb
 local TELE_URL = "https://raw.githubusercontent.com/"..USERNAME.."/"..REPO.."/main/modules/teleport.lua" .. cb
+local FISH_URL = "https://raw.githubusercontent.com/"..USERNAME.."/"..REPO.."/main/modules/autoFish.lua" .. cb
 
 local function fetch(url)
     local success, result = pcall(function() return game:HttpGet(url) end)
@@ -15,8 +16,9 @@ end
 local UI_Module = fetch(GUI_URL)
 local Logic_Module = fetch(LOOP_URL)
 local Teleport_Module = fetch(TELE_URL)
+local Fish_Module = fetch(FISH_URL)
 
-if UI_Module and Logic_Module and Teleport_Module then
+if UI_Module and Logic_Module and Teleport_Module and Fish_Module then
     -- Run layout environment setup
     local App = UI_Module.Create()
     
@@ -92,10 +94,19 @@ if UI_Module and Logic_Module and Teleport_Module then
     end)
     
     -------------------------------------------
+    -- TAB 3: Utilities and config
+    -------------------------------------------
+    UI_Module.AddToggle(SettingsPage, "Enable Auto Fishing (Bypass)", function(state)
+        Fish_Module.Enabled = state
+        if state then Fish_Module.Start() else Fish_Module.Stop() end
+    end)
+    
+    -------------------------------------------
     -- CLEANUP
     -------------------------------------------
     UI_Module.OnExit(function()
         Logic_Module.Stop()
+        Fish_Module.Stop()
         if PortableMenu then PortableMenu.Destroy() end
     end)
     
