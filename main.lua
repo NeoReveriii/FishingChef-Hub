@@ -181,80 +181,142 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Modul
         if state then Fish_Module.Start() else Fish_Module.Stop() end
     end)
 
-    UI_Module.AddSectionLabel(SettingsPage, "Give Fish Probe")
+    UI_Module.AddSectionLabel(SettingsPage, "Admin Probe")
 
-    -- Try to fire every plausible giveFish remote and report back
-    local GiveFishBtn = Instance.new("TextButton", SettingsPage)
-    GiveFishBtn.Size = UDim2.new(0.95, 0, 0, 30)
-    GiveFishBtn.BackgroundColor3 = Color3.fromRGB(155, 89, 182)
-    GiveFishBtn.Text = "🐟 Try Give Fish"
-    GiveFishBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    GiveFishBtn.Font = Enum.Font.GothamMedium
-    GiveFishBtn.TextSize = 13
-    Instance.new("UICorner", GiveFishBtn).CornerRadius = UDim.new(0, 6)
+    -- Step 1: Enumerate everything DefaultAdmin service exposes
+    local ScanAdminBtn = Instance.new("TextButton", SettingsPage)
+    ScanAdminBtn.Size = UDim2.new(0.95, 0, 0, 30)
+    ScanAdminBtn.BackgroundColor3 = Color3.fromRGB(155, 89, 182)
+    ScanAdminBtn.Text = "🔍 Scan DefaultAdmin Remotes"
+    ScanAdminBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ScanAdminBtn.Font = Enum.Font.GothamMedium
+    ScanAdminBtn.TextSize = 13
+    Instance.new("UICorner", ScanAdminBtn).CornerRadius = UDim.new(0, 6)
 
-    GiveFishBtn.MouseButton1Click:Connect(function()
-        GiveFishBtn.Text = "Probing..."
+    ScanAdminBtn.MouseButton1Click:Connect(function()
+        ScanAdminBtn.Text = "Scanning..."
         task.spawn(function()
-            local RS       = game:GetService("ReplicatedStorage")
-            local Players  = game:GetService("Players")
-            local LocalPlayer = Players.LocalPlayer
+            local RS = game:GetService("ReplicatedStorage")
 
-            -- All the names we saw / plausible variants
-            local remoteNames = {
-                "giveFish", "GiveFish", "give_fish", "Give_Fish",
-                "giveFishes", "GiveFishes",
+            local ok, Services = pcall(function()
+                return RS:WaitForChild("Packages",5)
+                         :WaitForChild("Knit",5)
+                         :WaitForChild("Services",5)
+            end)
+            if not ok then
+                print("[AdminProbe]: Could not reach Knit Services")
+                ScanAdminBtn.Text = "🔍 Scan DefaultAdmin Remotes"
+                return
+            end
+
+            -- Find ANY admin-sounding service
+            local adminServices = {}
+            for _, svc in ipairs(Services:GetChildren()) do
+                local lower = string.lower(svc.Name)
+                if string.find(lower, "admin") or string.find(lower, "command") or string.find(lower, "default") then
+                    table.insert(adminServices, svc)
+                end
+            end
+
+            if #adminServices == 0 then
+                print("[AdminProbe]: No admin-like services found under Knit Services.")
+                ScanAdminBtn.Text = "🔍 Scan DefaultAdmin Remotes"
+                return
+            end
+
+            for _, svc in ipairs(adminServices) do
+                print("[AdminProbe]: ── Service: " .. svc:GetFullName())
+
+                -- Enumerate every child recursively (RE, RF, ModuleScripts, etc.)
+                local function enumerate(obj, depth)
+                    local indent = string.rep("  ", depth)
+                    for _, child in ipairs(obj:GetChildren()) do
+                        print("[AdminProbe]: " .. indent .. child.ClassName .. " | " .. child.Name)
+                        enumerate(child, depth + 1)
+                    end
+                end
+                enumerate(svc, 1)
+            end
+
+            ScanAdminBtn.Text = "🔍 Scan DefaultAdmin Remotes"
+        end)
+    end)
+
+    -- Step 2: Try common RunCommand-style remotes with giveFish
+    local RunCmdBtn = Instance.new("TextButton", SettingsPage)
+    RunCmdBtn.Size = UDim2.new(0.95, 0, 0, 30)
+    RunCmdBtn.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
+    RunCmdBtn.Text = "⚡ Try RunCommand giveFish"
+    RunCmdBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    RunCmdBtn.Font = Enum.Font.GothamMedium
+    RunCmdBtn.TextSize = 13
+    Instance.new("UICorner", RunCmdBtn).CornerRadius = UDim.new(0, 6)
+
+    RunCmdBtn.MouseButton1Click:Connect(function()
+        RunCmdBtn.Text = "Trying..."
+        task.spawn(function()
+            local RS = game:GetService("ReplicatedStorage")
+            local LocalPlayer = game:GetService("Players").LocalPlayer
+
+            local ok, Services = pcall(function()
+                return RS:WaitForChild("Packages",5)
+                         :WaitForChild("Knit",5)
+                         :WaitForChild("Services",5)
+            end)
+            if not ok then
+                print("[AdminProbe]: Could not reach Knit Services")
+                RunCmdBtn.Text = "⚡ Try RunCommand giveFish"
+                return
+            end
+
+            -- Names that admin systems typically use for their executor remote
+            local runRemoteNames = {
+                "RunCommand", "ExecuteCommand", "RunCmd", "Execute",
+                "Command", "AdminCommand", "HandleCommand", "ProcessCommand",
+                "Run", "Invoke", "CallCommand",
             }
 
-            -- Container paths to check for both RE and RF
-            local containers = {}
-            pcall(function()
-                local Services = RS:WaitForChild("Packages",5):WaitForChild("Knit",5):WaitForChild("Services",5)
-                local Fish = Services:FindFirstChild("Fish")
-                if Fish then
-                    table.insert(containers, Fish:FindFirstChild("RE"))
-                    table.insert(containers, Fish:FindFirstChild("RF"))
+            -- Args shapes to try for each remote
+            local argShapes = {
+                function(r) r:FireServer("giveFish") end,
+                function(r) r:FireServer("giveFish", {}) end,
+                function(r) r:FireServer("giveFish", LocalPlayer) end,
+                function(r) r:FireServer({cmd = "giveFish"}) end,
+                function(r) r:FireServer({command = "giveFish", args = {}}) end,
+                function(r) r:InvokeServer("giveFish") end,
+                function(r) r:InvokeServer("giveFish", LocalPlayer) end,
+            }
+
+            local found = 0
+            for _, svc in ipairs(Services:GetChildren()) do
+                local lower = string.lower(svc.Name)
+                if not (string.find(lower, "admin") or string.find(lower, "command") or string.find(lower, "default")) then
+                    continue
                 end
-                local Admin = Services:FindFirstChild("DefaultAdmin") or Services:FindFirstChild("Admin")
-                if Admin then
-                    table.insert(containers, Admin:FindFirstChild("RE"))
-                    table.insert(containers, Admin:FindFirstChild("RF"))
-                    table.insert(containers, Admin)
-                end
-            end)
 
-            -- Also search root of RS directly
-            table.insert(containers, RS)
-
-            local attempted = 0
-            for _, container in ipairs(containers) do
-                if not container then continue end
-                for _, name in ipairs(remoteNames) do
-                    local remote = container:FindFirstChild(name)
-                    if remote then
-                        attempted = attempted + 1
-                        print("[GiveFish]: Found '" .. name .. "' (" .. remote.ClassName .. ") in " .. container:GetFullName())
-
-                        if remote:IsA("RemoteEvent") then
-                            -- Try firing with common arg shapes
-                            local ok1 = pcall(function() remote:FireServer() end)
-                            local ok2 = pcall(function() remote:FireServer(LocalPlayer) end)
-                            local ok3 = pcall(function() remote:FireServer("salmon", 1) end)
-                            print("[GiveFish]: FireServer attempts: bare=" .. tostring(ok1) .. " player=" .. tostring(ok2) .. " named=" .. tostring(ok3))
-
-                        elseif remote:IsA("RemoteFunction") then
-                            local ok, result = pcall(function() return remote:InvokeServer() end)
-                            print("[GiveFish]: InvokeServer result: ok=" .. tostring(ok) .. " | " .. tostring(result))
+                for _, container in ipairs(svc:GetChildren()) do
+                    for _, name in ipairs(runRemoteNames) do
+                        local remote = container:FindFirstChild(name)
+                        if not remote then
+                            remote = svc:FindFirstChild(name)
+                        end
+                        if remote and (remote:IsA("RemoteEvent") or remote:IsA("RemoteFunction")) then
+                            found = found + 1
+                            print("[AdminProbe]: Trying '" .. name .. "' in " .. remote:GetFullName())
+                            for i, fn in ipairs(argShapes) do
+                                local attemptOk, err = pcall(fn, remote)
+                                print("[AdminProbe]:   Shape " .. i .. " -> ok=" .. tostring(attemptOk) .. (not attemptOk and (" | " .. tostring(err)) or ""))
+                            end
                         end
                     end
                 end
             end
 
-            if attempted == 0 then
-                print("[GiveFish]: No giveFish remote found in any known location. Server probably handles it via chat command only.")
+            if found == 0 then
+                print("[AdminProbe]: No RunCommand-style remote found. The admin system likely only listens to player chat — not exploitable via remote.")
             end
 
-            GiveFishBtn.Text = "🐟 Try Give Fish"
+            RunCmdBtn.Text = "⚡ Try RunCommand giveFish"
         end)
     end)
     
