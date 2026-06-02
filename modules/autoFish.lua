@@ -36,14 +36,25 @@ function AutoFish.Start()
                 -- 0. Remote Teleport
                 if AutoFish.RemoteLocation and AutoFish.RemoteLocation ~= "None" and AutoFish.TeleportModule then
                     AutoFish.TeleportModule.To(AutoFish.RemoteLocation)
-                    task.wait(0.3) -- Reduced from 0.8s - faster teleport
+                    task.wait(0.1) -- Near-instant teleport
                 end
                 
-                -- 1. Equip Rod
+                -- 1. Equip Rod (check if already equipped first)
                 local char = LocalPlayer.Character
-                if char then
-                    local humanoid = char:FindFirstChild("Humanoid")
-                    if humanoid then
+                local humanoid = char and char:FindFirstChild("Humanoid")
+                local rodEquipped = false
+                
+                if char and humanoid then
+                    -- Check if rod is already in character
+                    for _, tool in ipairs(char:GetChildren()) do
+                        if tool:IsA("Tool") and string.find(string.lower(tool.Name), "rod") then
+                            rodEquipped = true
+                            break
+                        end
+                    end
+                    
+                    -- Only equip if not already equipped
+                    if not rodEquipped then
                         for _, tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
                             if tool:IsA("Tool") and string.find(string.lower(tool.Name), "rod") then
                                 humanoid:EquipTool(tool)
@@ -53,26 +64,26 @@ function AutoFish.Start()
                     end
                 end
                 
-                task.wait(0.2) -- Reduced from 0.5s - faster equip
+                task.wait(0.05) -- Minimal equip delay
                 
                 -- 2. Cast the rod
                 CastRequest:InvokeServer(0.8885351153781718)
                 
-                -- Optimized wait time - reduced from 6s to 3.5s for faster fishing
-                -- This is the minimum time needed for fish to bite reliably
-                task.wait(3.5) 
+                -- 3. INSTANT CATCH ATTEMPT - Try to catch immediately after cast
+                -- This may not work if server requires minimum bite time
+                task.wait(0.5) -- Aggressive reduction - testing instant catch
                 
-                -- 3. Log step and resolve minigame as a win
+                -- 4. Log step and resolve minigame as a win
                 LogStep:InvokeServer(4)
                 MinigameResolved:InvokeServer(true)
                 
-                -- 4. Return to Restaurant/Plot
+                -- 5. Return to Restaurant/Plot
                 if AutoFish.RemoteLocation and AutoFish.RemoteLocation ~= "None" and GoPlot then
                     GoPlot:FireServer()
-                    task.wait(0.3) -- Reduced from 0.8s - faster return
+                    task.wait(0.1) -- Near-instant return
                 end
             end)
-            task.wait(0.5) -- Reduced from 2s - faster loop cycle
+            task.wait(0.1) -- Minimal loop delay
         end
     end)
 end
