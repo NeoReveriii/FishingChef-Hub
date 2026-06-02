@@ -36,7 +36,7 @@ function GUI.Create()
     local AppTitle = Instance.new("TextLabel", Sidebar)
     AppTitle.Size = UDim2.new(1, 0, 0, 45)
     AppTitle.BackgroundTransparency = 1
-    AppTitle.Text = "  🎣 AutoSuite Pro"
+    AppTitle.Text = "Kilabot Hub"
     AppTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
     AppTitle.Font = Enum.Font.GothamBold
     AppTitle.TextSize = 14
@@ -161,57 +161,94 @@ function GUI.Create()
         end)
     end
 
-    -- 🛠️ UI COMPONENT: DROPDOWN CHOICE SELECTION
+    -- 🛠️ UPGRADED UI COMPONENT: FLOATING OVERLAY DROPDOWN (Matches image_4a7bdd.png)
     function GUI.AddDropdown(parentPage, text, listOptions, callback)
         local DropdownFrame = Instance.new("Frame", parentPage)
-        DropdownFrame.Size = UDim2.new(0.95, 0, 0, 40)
-        DropdownFrame.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
-        DropdownFrame.ClipsDescendants = true
-        Instance.new("UICorner", DropdownFrame).CornerRadius = UDim.new(0, 6)
+        DropdownFrame.Size = UDim2.new(0.95, 0, 0, 45)
+        DropdownFrame.BackgroundTransparency = 1
         
+        -- Left Label Text Description
+        local Label = Instance.new("TextLabel", DropdownFrame)
+        Label.Size = UDim2.new(0.5, -10, 1, 0)
+        Label.Position = UDim2.new(0, 10, 0, 0)
+        Label.BackgroundTransparency = 1
+        Label.Text = text
+        Label.TextColor3 = Color3.fromRGB(200, 200, 200)
+        Label.Font = Enum.Font.GothamMedium
+        Label.TextSize = 13
+        Label.TextXAlignment = Enum.TextXAlignment.Left
+        
+        -- Right Selection Display Box Container
         local MainBtn = Instance.new("TextButton", DropdownFrame)
-        MainBtn.Size = UDim2.new(1, 0, 0, 40)
-        MainBtn.BackgroundTransparency = 1
-        MainBtn.Text = "  " .. text .. ": Select..."
-        MainBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+        MainBtn.Size = UDim2.new(0.5, 0, 0.8, 0)
+        MainBtn.Position = UDim2.new(0.5, 0, 0.1, 0)
+        MainBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+        MainBtn.Text = "Select...  ↕"
+        MainBtn.TextColor3 = Color3.fromRGB(160, 160, 160)
         MainBtn.Font = Enum.Font.GothamMedium
-        MainBtn.TextSize = 13
-        MainBtn.TextXAlignment = Enum.TextXAlignment.Left
+        MainBtn.TextSize = 12
+        Instance.new("UICorner", MainBtn).CornerRadius = UDim.new(0, 6)
         
-        local ListContainer = Instance.new("Frame", DropdownFrame)
-        ListContainer.Size = UDim2.new(1, 0, 0, #listOptions * 30)
-        ListContainer.Position = UDim2.new(0, 0, 0, 40)
-        ListContainer.BackgroundTransparency = 1
+        -- Generate Floating Menu List Portal Layer
+        local FloatingList = Instance.new("Frame")
+        FloatingList.Name = "FloatingDropdown"
+        FloatingList.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
+        FloatingList.BorderSizePixel = 0
+        FloatingList.ZIndex = 100 -- Places it absolutely on top of everything
+        FloatingList.Visible = false
+        FloatingList.Parent = ScreenGui -- Attach directly to top screen engine hierarchy
         
-        local listLayout = Instance.new("UIListLayout", ListContainer)
-        listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+        Instance.new("UICorner", FloatingList).CornerRadius = UDim.new(0, 6)
+        local Stroke = Instance.new("UIStroke", FloatingList)
+        Stroke.Color = Color3.fromRGB(35, 35, 35)
+        Stroke.Thickness = 1
         
-        for idx, option in ipairs(listOptions) do
-            local OptBtn = Instance.new("TextButton", ListContainer)
-            OptBtn.Size = UDim2.new(1, 0, 0, 30)
-            OptBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+        local ListScroll = Instance.new("ScrollingFrame", FloatingList)
+        ListScroll.Size = UDim2.new(1, 0, 1, 0)
+        ListScroll.BackgroundTransparency = 1
+        ListScroll.ScrollBarThickness = 0
+        ListScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+        
+        local listLayout = Instance.new("UIListLayout", ListScroll)
+        listLayout.Padding = UDim.new(0, 2)
+        listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+        
+        -- Populate elements inside overlay panel container
+        for _, option in ipairs(listOptions) do
+            local OptBtn = Instance.new("TextButton", ListScroll)
+            OptBtn.Size = UDim2.new(0.95, 0, 0, 30)
+            OptBtn.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
             OptBtn.BorderSizePixel = 0
-            OptBtn.Text = "    " .. option
+            OptBtn.Text = "  " .. option
             OptBtn.TextColor3 = Color3.fromRGB(160, 160, 160)
-            OptBtn.Font = Enum.Font.Gotham
+            OptBtn.Font = Enum.Font.GothamMedium
             OptBtn.TextSize = 12
             OptBtn.TextXAlignment = Enum.TextXAlignment.Left
+            OptBtn.ZIndex = 101
+            Instance.new("UICorner", OptBtn).CornerRadius = UDim.new(0, 4)
+            
+            -- Simple hover aesthetics
+            OptBtn.MouseEnter:Connect(function() OptBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30) end)
+            OptBtn.MouseLeave:Connect(function() OptBtn.BackgroundColor3 = Color3.fromRGB(22, 22, 22) end)
             
             OptBtn.MouseButton1Click:Connect(function()
-                MainBtn.Text = "  " .. text .. ": " .. option
-                DropdownFrame.Size = UDim2.new(0.95, 0, 0, 40)
+                MainBtn.Text = option .. "  ↕"
+                FloatingList.Visible = false
                 if callback then callback(option) end
             end)
         end
         
+        -- Coordinate recalculation execution logic
         local open = false
         MainBtn.MouseButton1Click:Connect(function()
             open = not open
-            local targetHeight = open and (40 + (#listOptions * 30)) or 40
-            DropdownFrame.Size = UDim2.new(0.95, 0, 0, targetHeight)
-            -- Simple window container resizing adjustment logic
-            if parentPage:IsA("ScrollingFrame") then
-                parentPage.CanvasSize = UDim2.new(0, 0, 0, parentPage.UIListLayout.AbsoluteContentSize.Y + 20)
+            if open then
+                local btnAbsolutePos = MainBtn.AbsolutePosition
+                FloatingList.Position = UDim2.new(0, btnAbsolutePos.X, 0, btnAbsolutePos.Y + MainBtn.AbsoluteSize.Y + 4)
+                FloatingList.Size = UDim2.new(0, MainBtn.AbsoluteSize.X, 0, math.min(#listOptions * 32 + 4, 150))
+                FloatingList.Visible = true
+            else
+                FloatingList.Visible = false
             end
         end)
     end
