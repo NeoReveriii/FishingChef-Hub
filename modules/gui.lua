@@ -245,12 +245,55 @@ function GUI.Create()
             if open then
                 local btnAbsolutePos = MainBtn.AbsolutePosition
                 FloatingList.Position = UDim2.new(0, btnAbsolutePos.X, 0, btnAbsolutePos.Y + MainBtn.AbsoluteSize.Y + 4)
-                FloatingList.Size = UDim2.new(0, MainBtn.AbsoluteSize.X, 0, math.min(#listOptions * 32 + 4, 150))
+                
+                -- Count options for size
+                local optionCount = 0
+                for _, child in ipairs(ListScroll:GetChildren()) do
+                    if child:IsA("TextButton") then optionCount = optionCount + 1 end
+                end
+                
+                FloatingList.Size = UDim2.new(0, MainBtn.AbsoluteSize.X, 0, math.min(optionCount * 32 + 4, 150))
                 FloatingList.Visible = true
             else
                 FloatingList.Visible = false
             end
         end)
+        
+        -- Return a table with a Refresh function
+        return {
+            Refresh = function(newOptions)
+                -- Clear old options
+                for _, child in ipairs(ListScroll:GetChildren()) do
+                    if child:IsA("TextButton") then
+                        child:Destroy()
+                    end
+                end
+                
+                -- Repopulate
+                for _, option in ipairs(newOptions) do
+                    local OptBtn = Instance.new("TextButton", ListScroll)
+                    OptBtn.Size = UDim2.new(0.95, 0, 0, 30)
+                    OptBtn.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
+                    OptBtn.BorderSizePixel = 0
+                    OptBtn.Text = "  " .. tostring(option)
+                    OptBtn.TextColor3 = Color3.fromRGB(160, 160, 160)
+                    OptBtn.Font = Enum.Font.GothamMedium
+                    OptBtn.TextSize = 12
+                    OptBtn.TextXAlignment = Enum.TextXAlignment.Left
+                    OptBtn.ZIndex = 101
+                    Instance.new("UICorner", OptBtn).CornerRadius = UDim.new(0, 4)
+                    
+                    OptBtn.MouseEnter:Connect(function() OptBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30) end)
+                    OptBtn.MouseLeave:Connect(function() OptBtn.BackgroundColor3 = Color3.fromRGB(22, 22, 22) end)
+                    
+                    OptBtn.MouseButton1Click:Connect(function()
+                        MainBtn.Text = tostring(option) .. "  ↕"
+                        FloatingList.Visible = false
+                        if callback then callback(option) end
+                    end)
+                end
+            end
+        }
     end
 
     function GUI.OnExit(callback)

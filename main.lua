@@ -21,10 +21,38 @@ if UI_Module and Logic_Module then
     local SettingsPage = UI_Module.AddTab("Utilities & Config")
     
     -- Sync dropdown choice to backend configuration data state
-    local fishChoices = {"marlin", "great_white_shark", "yellowtail_kingfish", "moonlight_koi"}
-    UI_Module.AddDropdown(CookPage, "Target Species Selection", fishChoices, function(choice)
+    local dropdownController = UI_Module.AddDropdown(CookPage, "Target Species Selection", {"Loading..."}, function(choice)
         Logic_Module.SelectedFish = choice
         print("🎯 State Change: Set target species value to -> " .. choice)
+    end)
+    
+    -- Refresh button to fetch inventory and update dropdown
+    local RefreshBtn = Instance.new("TextButton", CookPage)
+    RefreshBtn.Size = UDim2.new(0.95, 0, 0, 30)
+    RefreshBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+    RefreshBtn.Text = "Refresh Inventory"
+    RefreshBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    RefreshBtn.Font = Enum.Font.GothamMedium
+    RefreshBtn.TextSize = 13
+    Instance.new("UICorner", RefreshBtn).CornerRadius = UDim.new(0, 6)
+    
+    RefreshBtn.MouseButton1Click:Connect(function()
+        RefreshBtn.Text = "Refreshing..."
+        task.spawn(function()
+            local available = Logic_Module.GetAvailableFish()
+            if #available == 0 then
+                available = {"No Fish Found"}
+            end
+            dropdownController.Refresh(available)
+            RefreshBtn.Text = "Refresh Inventory"
+        end)
+    end)
+    
+    -- Initial population
+    task.spawn(function()
+        local available = Logic_Module.GetAvailableFish()
+        if #available == 0 then available = {"No Fish Found"} end
+        dropdownController.Refresh(available)
     end)
     
     -- Sync toggle switch directly to background execution thread

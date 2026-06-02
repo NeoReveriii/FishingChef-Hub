@@ -5,6 +5,46 @@ local loopThread = nil
 AutoCook.Enabled = false
 AutoCook.SelectedFish = "great_white_shark" -- Target fish for Sashimi
 
+-- 🛠️ Request inventory directly to generate our dynamic UI dropdown
+function AutoCook.GetAvailableFish()
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    local Packages = ReplicatedStorage:FindFirstChild("Packages")
+    if not Packages then return {} end
+    
+    local Knit = Packages:FindFirstChild("Knit")
+    if not Knit then return {} end
+    
+    local Services = Knit:FindFirstChild("Services")
+    if not Services then return {} end
+    
+    local FishServices = Services:FindFirstChild("Fish")
+    if not FishServices then return {} end
+    
+    local FishRF = FishServices:FindFirstChild("RF")
+    if not FishRF then return {} end
+    
+    local RequestFishData = FishRF:FindFirstChild("RequestFishData")
+    if not RequestFishData then return {} end
+    
+    local success, inventory = pcall(function()
+        return RequestFishData:InvokeServer()
+    end)
+    
+    local uniqueFish = {}
+    local added = {}
+    if success and type(inventory) == "table" then
+        for _, item in pairs(inventory) do
+            local fishName = item.CF or item.Name
+            if fishName and not added[fishName] then
+                added[fishName] = true
+                table.insert(uniqueFish, fishName)
+            end
+        end
+    end
+    
+    return uniqueFish
+end
+
 -- Background Task Execution Core Loop
 function AutoCook.Start()
     if loopThread then task.cancel(loopThread) end
@@ -108,11 +148,11 @@ function AutoCook.Start()
                         
                         -- 3.7: Cook Sashimi
                         local cookPayload = {
-                            CF = "great_white_shark",
+                            CF = targetFishItem.CF or AutoCook.SelectedFish,
                             Name = "Fish Filet",
                             Amount = 1,
                             ID = targetFishItem.ID or 15,
-                            Data = 4, 
+                            Data = 5, -- 🌟 5 Forces Legendary Quality (3 Perfect Cuts)
                             Value = 0
                         }
                         
