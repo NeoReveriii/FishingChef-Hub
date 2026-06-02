@@ -180,6 +180,83 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Modul
         Fish_Module.Enabled = state
         if state then Fish_Module.Start() else Fish_Module.Stop() end
     end)
+
+    UI_Module.AddSectionLabel(SettingsPage, "Give Fish Probe")
+
+    -- Try to fire every plausible giveFish remote and report back
+    local GiveFishBtn = Instance.new("TextButton", SettingsPage)
+    GiveFishBtn.Size = UDim2.new(0.95, 0, 0, 30)
+    GiveFishBtn.BackgroundColor3 = Color3.fromRGB(155, 89, 182)
+    GiveFishBtn.Text = "🐟 Try Give Fish"
+    GiveFishBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    GiveFishBtn.Font = Enum.Font.GothamMedium
+    GiveFishBtn.TextSize = 13
+    Instance.new("UICorner", GiveFishBtn).CornerRadius = UDim.new(0, 6)
+
+    GiveFishBtn.MouseButton1Click:Connect(function()
+        GiveFishBtn.Text = "Probing..."
+        task.spawn(function()
+            local RS       = game:GetService("ReplicatedStorage")
+            local Players  = game:GetService("Players")
+            local LocalPlayer = Players.LocalPlayer
+
+            -- All the names we saw / plausible variants
+            local remoteNames = {
+                "giveFish", "GiveFish", "give_fish", "Give_Fish",
+                "giveFishes", "GiveFishes",
+            }
+
+            -- Container paths to check for both RE and RF
+            local containers = {}
+            pcall(function()
+                local Services = RS:WaitForChild("Packages",5):WaitForChild("Knit",5):WaitForChild("Services",5)
+                local Fish = Services:FindFirstChild("Fish")
+                if Fish then
+                    table.insert(containers, Fish:FindFirstChild("RE"))
+                    table.insert(containers, Fish:FindFirstChild("RF"))
+                end
+                local Admin = Services:FindFirstChild("DefaultAdmin") or Services:FindFirstChild("Admin")
+                if Admin then
+                    table.insert(containers, Admin:FindFirstChild("RE"))
+                    table.insert(containers, Admin:FindFirstChild("RF"))
+                    table.insert(containers, Admin)
+                end
+            end)
+
+            -- Also search root of RS directly
+            table.insert(containers, RS)
+
+            local attempted = 0
+            for _, container in ipairs(containers) do
+                if not container then continue end
+                for _, name in ipairs(remoteNames) do
+                    local remote = container:FindFirstChild(name)
+                    if remote then
+                        attempted = attempted + 1
+                        print("[GiveFish]: Found '" .. name .. "' (" .. remote.ClassName .. ") in " .. container:GetFullName())
+
+                        if remote:IsA("RemoteEvent") then
+                            -- Try firing with common arg shapes
+                            local ok1 = pcall(function() remote:FireServer() end)
+                            local ok2 = pcall(function() remote:FireServer(LocalPlayer) end)
+                            local ok3 = pcall(function() remote:FireServer("salmon", 1) end)
+                            print("[GiveFish]: FireServer attempts: bare=" .. tostring(ok1) .. " player=" .. tostring(ok2) .. " named=" .. tostring(ok3))
+
+                        elseif remote:IsA("RemoteFunction") then
+                            local ok, result = pcall(function() return remote:InvokeServer() end)
+                            print("[GiveFish]: InvokeServer result: ok=" .. tostring(ok) .. " | " .. tostring(result))
+                        end
+                    end
+                end
+            end
+
+            if attempted == 0 then
+                print("[GiveFish]: No giveFish remote found in any known location. Server probably handles it via chat command only.")
+            end
+
+            GiveFishBtn.Text = "🐟 Try Give Fish"
+        end)
+    end)
     
     -------------------------------------------
     -- CLEANUP
