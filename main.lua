@@ -96,6 +96,13 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module then
     -------------------------------------------
     -- TAB 3: Utilities and config
     -------------------------------------------
+    Fish_Module.TeleportModule = Teleport_Module
+    Fish_Module.RemoteLocation = "None"
+    
+    UI_Module.AddDropdown(SettingsPage, "Remote Fishing Location", {"None", "Koi Pond", "Razor Reef", "Bamboo Forest"}, false, function(choice)
+        Fish_Module.RemoteLocation = choice
+    end)
+    
     UI_Module.AddToggle(SettingsPage, "Enable Auto Fishing (Bypass)", function(state)
         Fish_Module.Enabled = state
         if state then Fish_Module.Start() else Fish_Module.Stop() end
