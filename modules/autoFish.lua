@@ -23,21 +23,38 @@ function AutoFish.Start()
         local MinigameResolved = FishRF:WaitForChild("MinigameResolved")
         local LogStep = AnalyticsRF:WaitForChild("LogStep")
         
+        local LocalPlayer = game:GetService("Players").LocalPlayer
+        
         while AutoFish.Enabled do
             pcall(function()
+                -- 0. Equip Rod
+                local char = LocalPlayer.Character
+                if char then
+                    local humanoid = char:FindFirstChild("Humanoid")
+                    if humanoid then
+                        for _, tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
+                            if tool:IsA("Tool") and string.find(string.lower(tool.Name), "rod") then
+                                humanoid:EquipTool(tool)
+                                break
+                            end
+                        end
+                    end
+                end
+                
+                task.wait(0.5) -- wait for equip
+                
                 -- 1. Cast the rod
                 CastRequest:InvokeServer(0.8885351153781718)
                 
-                -- Note: You might need to wait for a specific remote event that tells you a fish has bitten.
-                -- For now, we will wait a brief moment and instantly resolve the minigame.
-                -- If this doesn't work, we'll need to listen to a FishBitten RemoteEvent!
-                task.wait(2.5) 
+                -- The reason you didn't catch anything is because 2.5s is too fast!
+                -- It reeled in before the fish could bite. Let's wait longer:
+                task.wait(6) 
                 
                 -- 2. Log step and resolve minigame as a win
                 LogStep:InvokeServer(4)
                 MinigameResolved:InvokeServer(true)
             end)
-            task.wait(1)
+            task.wait(2)
         end
     end)
 end
