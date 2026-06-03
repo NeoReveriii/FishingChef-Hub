@@ -33,7 +33,7 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Modul
     -------------------------------------------
     -- TAB 1: Auto Cooking
     -------------------------------------------
-    UI_Module.AddDropdown(CookPage, "Target Recipe Cuisine", {"Sashimi", "Nigiri"}, false, function(choice)
+    UI_Module.AddDropdown(CookPage, "Target Recipe Cuisine", {"Sashimi", "Nigiri", "Sushi"}, false, function(choice)
         Logic_Module.SelectedRecipe = choice
         print("[State]: Set target recipe to -> " .. choice)
     end)

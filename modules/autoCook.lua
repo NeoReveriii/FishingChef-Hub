@@ -125,9 +125,9 @@ function AutoCook.Start()
                         StartCutSession:InvokeServer()
                         task.wait(0.2)
                         
-                        -- 3.3: Cut Actions - Different sequence for Nigiri (2 cuts) vs Sashimi (3 cuts)
-                        if AutoCook.SelectedRecipe == "Nigiri" then
-                            -- Nigiri requires 2 cuts
+                        -- 3.3: Cut Actions - Different sequence for Nigiri/Sushi (2 cuts) vs Sashimi (3 cuts)
+                        if AutoCook.SelectedRecipe == "Nigiri" or AutoCook.SelectedRecipe == "Sushi" then
+                            -- Nigiri and Sushi require 2 cuts
                             CutAction:FireServer(1)
                             task.wait(0.1)
                             CutAction:FireServer(2)
@@ -170,7 +170,7 @@ function AutoCook.Start()
                             Name = "Fish Filet",
                             Amount = 1,
                             ID = targetFishItem.ID or 15,
-                            Data = (AutoCook.SelectedRecipe == "Nigiri") and 4 or 5, -- 4 for Nigiri, 5 for Sashimi
+                            Data = (AutoCook.SelectedRecipe == "Nigiri" or AutoCook.SelectedRecipe == "Sushi") and 4 or 5, -- 4 for Nigiri/Sushi, 5 for Sashimi
                             Value = 0
                         }
                         

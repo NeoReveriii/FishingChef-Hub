@@ -78,6 +78,7 @@ function GUI.Create()
     ContentArea.Size = UDim2.new(1, -190, 1, -45)
     ContentArea.Position = UDim2.new(0, 175, 0, 40)
     ContentArea.BackgroundTransparency = 1
+    ContentArea.ClipsDescendants = false
 
     local ExitButton = Instance.new("TextButton", MainFrame)
     ExitButton.Size = UDim2.new(0, 24, 0, 24)
@@ -120,15 +121,10 @@ function GUI.Create()
         PageFrame.BackgroundTransparency = 1
         PageFrame.Visible = false
         PageFrame.ScrollBarThickness = 2
-        PageFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+        PageFrame.CanvasSize = UDim2.new(0, 0, 0, 1000)
         
         local PageLayout = Instance.new("UIListLayout", PageFrame)
         PageLayout.Padding = UDim.new(0, 10)
-        
-        -- Automatically update CanvasSize when content changes
-        PageLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-            PageFrame.CanvasSize = UDim2.new(0, 0, 0, PageLayout.AbsoluteContentSize.Y + 20)
-        end)
         
         local TabBtn = Instance.new("TextButton", NavList)
         TabBtn.Size = UDim2.new(0.9, 0, 0, 32)
@@ -235,10 +231,6 @@ function GUI.Create()
         MainBtn.TextTruncate = Enum.TextTruncate.AtEnd
         MainBtn.TextXAlignment = Enum.TextXAlignment.Left
         Instance.new("UICorner", MainBtn).CornerRadius = UDim.new(0, 5)
-        
-        local TextPadding = Instance.new("TextPadding", MainBtn)
-        TextPadding.PaddingLeft = 8
-        TextPadding.PaddingRight = 8
         
         local FloatingList = Instance.new("Frame")
         FloatingList.Name = "FloatingDropdown"
