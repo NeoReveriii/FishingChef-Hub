@@ -56,7 +56,7 @@ function GUI.Create()
     local AppTitle = Instance.new("TextLabel", Sidebar)
     AppTitle.Size = UDim2.new(1, 0, 0, 45)
     AppTitle.BackgroundTransparency = 1
-    AppTitle.Text = "   Kilabot Hub v.31c"
+    AppTitle.Text = "   Kilabot Hub v.4"
     AppTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
     AppTitle.Font = Enum.Font.GothamBold
     AppTitle.TextSize = 14

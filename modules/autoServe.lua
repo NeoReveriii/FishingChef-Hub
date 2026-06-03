@@ -75,169 +75,6 @@ local function FetchAvailableFish()
     return uniqueFish
 end
 
--- UI Creation
-function AutoServe.CreateUI()
-    local Players = game:GetService("Players")
-    local LocalPlayer = Players.LocalPlayer
-    local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-    
-    -- Check if UI already exists
-    if PlayerGui:FindFirstChild("AutoServeUI") then
-        PlayerGui.AutoServeUI:Destroy()
-    end
-    
-    local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "AutoServeUI"
-    screenGui.ResetOnSpawn = false
-    screenGui.Parent = PlayerGui
-    
-    -- Main Frame
-    local mainFrame = Instance.new("Frame")
-    mainFrame.Name = "MainFrame"
-    mainFrame.Size = UDim2.new(0, 300, 0, 250)
-    mainFrame.Position = UDim2.new(0.5, -150, 0.5, -125)
-    mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    mainFrame.BorderSizePixel = 0
-    mainFrame.Parent = screenGui
-    
-    -- Title
-    local title = Instance.new("TextLabel")
-    title.Name = "Title"
-    title.Size = UDim2.new(1, 0, 0, 40)
-    title.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    title.TextColor3 = Color3.fromRGB(255, 255, 255)
-    title.Text = "AutoServe Configuration"
-    title.TextSize = 18
-    title.Font = Enum.Font.GothamBold
-    title.Parent = mainFrame
-    
-    -- Toggle A: Serve Normal NPCs
-    local toggleAFrame = Instance.new("Frame")
-    toggleAFrame.Name = "ToggleAFrame"
-    toggleAFrame.Size = UDim2.new(1, -20, 0, 40)
-    toggleAFrame.Position = UDim2.new(0, 10, 0, 50)
-    toggleAFrame.BackgroundTransparency = 1
-    toggleAFrame.Parent = mainFrame
-    
-    local toggleAText = Instance.new("TextLabel")
-    toggleAText.Size = UDim2.new(0.7, 0, 1, 0)
-    toggleAText.BackgroundTransparency = 1
-    toggleAText.TextColor3 = Color3.fromRGB(255, 255, 255)
-    toggleAText.Text = "Serve Normal NPCs"
-    toggleAText.TextSize = 14
-    toggleAText.TextXAlignment = Enum.TextXAlignment.Left
-    toggleAText.Font = Enum.Font.Gotham
-    toggleAText.Parent = toggleAFrame
-    
-    local toggleAButton = Instance.new("TextButton")
-    toggleAButton.Name = "ToggleAButton"
-    toggleAButton.Size = UDim2.new(0.25, 0, 0.7, 0)
-    toggleAButton.Position = UDim2.new(0.75, 0, 0.15, 0)
-    toggleAButton.BackgroundColor3 = AutoServe.Config.ServeNormalNPCs and Color3.fromRGB(76, 175, 80) or Color3.fromRGB(158, 158, 158)
-    toggleAButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    toggleAButton.Text = AutoServe.Config.ServeNormalNPCs and "ON" or "OFF"
-    toggleAButton.TextSize = 12
-    toggleAButton.Font = Enum.Font.GothamBold
-    toggleAButton.Parent = toggleAFrame
-    
-    toggleAButton.MouseButton1Click:Connect(function()
-        AutoServe.Config.ServeNormalNPCs = not AutoServe.Config.ServeNormalNPCs
-        toggleAButton.BackgroundColor3 = AutoServe.Config.ServeNormalNPCs and Color3.fromRGB(76, 175, 80) or Color3.fromRGB(158, 158, 158)
-        toggleAButton.Text = AutoServe.Config.ServeNormalNPCs and "ON" or "OFF"
-        debugLog("Toggle A (Serve Normal NPCs): " .. tostring(AutoServe.Config.ServeNormalNPCs))
-    end)
-    
-    -- Toggle B: Serve Special Guests
-    local toggleBFrame = Instance.new("Frame")
-    toggleBFrame.Name = "ToggleBFrame"
-    toggleBFrame.Size = UDim2.new(1, -20, 0, 40)
-    toggleBFrame.Position = UDim2.new(0, 10, 0, 100)
-    toggleBFrame.BackgroundTransparency = 1
-    toggleBFrame.Parent = mainFrame
-    
-    local toggleBText = Instance.new("TextLabel")
-    toggleBText.Size = UDim2.new(0.7, 0, 1, 0)
-    toggleBText.BackgroundTransparency = 1
-    toggleBText.TextColor3 = Color3.fromRGB(255, 255, 255)
-    toggleBText.Text = "Serve Special Guests"
-    toggleBText.TextSize = 14
-    toggleBText.TextXAlignment = Enum.TextXAlignment.Left
-    toggleBText.Font = Enum.Font.Gotham
-    toggleBText.Parent = toggleBFrame
-    
-    local toggleBButton = Instance.new("TextButton")
-    toggleBButton.Name = "ToggleBButton"
-    toggleBButton.Size = UDim2.new(0.25, 0, 0.7, 0)
-    toggleBButton.Position = UDim2.new(0.75, 0, 0.15, 0)
-    toggleBButton.BackgroundColor3 = AutoServe.Config.ServeSpecialGuests and Color3.fromRGB(76, 175, 80) or Color3.fromRGB(158, 158, 158)
-    toggleBButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    toggleBButton.Text = AutoServe.Config.ServeSpecialGuests and "ON" or "OFF"
-    toggleBButton.TextSize = 12
-    toggleBButton.Font = Enum.Font.GothamBold
-    toggleBButton.Parent = toggleBFrame
-    
-    toggleBButton.MouseButton1Click:Connect(function()
-        AutoServe.Config.ServeSpecialGuests = not AutoServe.Config.ServeSpecialGuests
-        toggleBButton.BackgroundColor3 = AutoServe.Config.ServeSpecialGuests and Color3.fromRGB(76, 175, 80) or Color3.fromRGB(158, 158, 158)
-        toggleBButton.Text = AutoServe.Config.ServeSpecialGuests and "ON" or "OFF"
-        debugLog("Toggle B (Serve Special Guests): " .. tostring(AutoServe.Config.ServeSpecialGuests))
-    end)
-    
-    -- VIP Dropdown Label
-    local vipLabel = Instance.new("TextLabel")
-    vipLabel.Name = "VIPLabel"
-    vipLabel.Size = UDim2.new(1, -20, 0, 25)
-    vipLabel.Position = UDim2.new(0, 10, 0, 150)
-    vipLabel.BackgroundTransparency = 1
-    vipLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    vipLabel.Text = "Select VIPs to Target:"
-    vipLabel.TextSize = 14
-    vipLabel.TextXAlignment = Enum.TextXAlignment.Left
-    vipLabel.Font = Enum.Font.Gotham
-    vipLabel.Parent = mainFrame
-    
-    -- VIP Selection Frame
-    local vipFrame = Instance.new("ScrollingFrame")
-    vipFrame.Name = "VIPFrame"
-    vipFrame.Size = UDim2.new(1, -20, 0, 60)
-    vipFrame.Position = UDim2.new(0, 10, 0, 180)
-    vipFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    vipFrame.BorderSizePixel = 0
-    vipFrame.ScrollBarThickness = 4
-    vipFrame.Parent = mainFrame
-    
-    local uiListLayout = Instance.new("UIListLayout")
-    uiListLayout.Parent = vipFrame
-    
-    -- Create VIP checkboxes
-    for i, vipName in ipairs(AVAILABLE_VIPS) do
-        local vipButton = Instance.new("TextButton")
-        vipButton.Name = "VIP_" .. vipName
-        vipButton.Size = UDim2.new(1, 0, 0, 25)
-        vipButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-        vipButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-        vipButton.Text = "☐ " .. vipName
-        vipButton.TextSize = 12
-        vipButton.Font = Enum.Font.Gotham
-        vipButton.Parent = vipFrame
-        
-        vipButton.MouseButton1Click:Connect(function()
-            local index = table.find(AutoServe.Config.SelectedVIPs, vipName)
-            if index then
-                table.remove(AutoServe.Config.SelectedVIPs, index)
-                vipButton.Text = "☐ " .. vipName
-                vipButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-            else
-                table.insert(AutoServe.Config.SelectedVIPs, vipName)
-                vipButton.Text = "☑ " .. vipName
-                vipButton.BackgroundColor3 = Color3.fromRGB(76, 175, 80)
-            end
-            debugLog("Selected VIPs: " .. table.concat(AutoServe.Config.SelectedVIPs, ", "))
-        end)
-    end
-    
-    debugLog("UI Created successfully")
-end
 
 -- Serve Food Wrapper Function
 local function ServeFood(npcInstance, foodName, targetSeatSlot)
@@ -546,9 +383,6 @@ end
 function AutoServe.Start()
     if loopThread then task.cancel(loopThread) end
     
-    -- Create UI
-    AutoServe.CreateUI()
-    
     print("[AutoServe]: Thread initialized.")
     debugLog("Starting AutoServe with configuration:")
     debugLog("  Serve Normal NPCs: " .. tostring(AutoServe.Config.ServeNormalNPCs))
@@ -714,17 +548,6 @@ function AutoServe.Stop()
         local OpenPlot = GameHandlerRE:WaitForChild("OpenPlot")
         OpenPlot:FireServer(false)
     end)
-    
-    -- Remove UI
-    local Players = game:GetService("Players")
-    local LocalPlayer = Players.LocalPlayer
-    local PlayerGui = LocalPlayer:FindFirstChild("PlayerGui")
-    if PlayerGui then
-        local ui = PlayerGui:FindFirstChild("AutoServeUI")
-        if ui then
-            ui:Destroy()
-        end
-    end
     
     print("[AutoServe]: Thread cleanly terminated.")
 end

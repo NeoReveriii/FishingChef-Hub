@@ -229,92 +229,23 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Modul
         if state then Serve_Module.Start() else Serve_Module.Stop() end
     end)
     
-    UI_Module.AddSectionLabel(ServePage, "FISH SELECTION PER RECIPE")
+    UI_Module.AddSectionLabel(ServePage, "SERVING MODE")
     
-    -- Get available fish for dropdowns
-    local function getAvailableFish()
-        local success, inventory = pcall(function()
-            return Logic_Module.GetAvailableFish()
-        end)
-        if success and inventory and #inventory > 0 then
-            return inventory
-        else
-            return {"No Fish Found"}
-        end
-    end
-    
-    -- Sashimi fish selection
-    local sashimiFishOptions = getAvailableFish()
-    local sashimiDropdown = UI_Module.AddDropdown(ServePage, "Sashimi Fish", sashimiFishOptions, false, function(choice)
-        if choice == "No Fish Found" then
-            Serve_Module.RecipeFish["Sashimi"] = nil
-        else
-            Serve_Module.RecipeFish["Sashimi"] = choice
-        end
-        print("[AutoServe]: Sashimi fish set to -> " .. tostring(Serve_Module.RecipeFish["Sashimi"]))
+    UI_Module.AddToggle(ServePage, "Serve Normal NPCs", function(state)
+        Serve_Module.Config.ServeNormalNPCs = state
+        print("[AutoServe]: Serve Normal NPCs -> " .. tostring(state))
     end)
     
-    -- Nigiri fish selection
-    local nigiriFishOptions = getAvailableFish()
-    local nigiriDropdown = UI_Module.AddDropdown(ServePage, "Nigiri Fish", nigiriFishOptions, false, function(choice)
-        if choice == "No Fish Found" then
-            Serve_Module.RecipeFish["Nigiri"] = nil
-        else
-            Serve_Module.RecipeFish["Nigiri"] = choice
-        end
-        print("[AutoServe]: Nigiri fish set to -> " .. tostring(Serve_Module.RecipeFish["Nigiri"]))
+    UI_Module.AddToggle(ServePage, "Serve Special Guests", function(state)
+        Serve_Module.Config.ServeSpecialGuests = state
+        print("[AutoServe]: Serve Special Guests -> " .. tostring(state))
     end)
     
-    -- Sushi fish selection
-    local sushiFishOptions = getAvailableFish()
-    local sushiDropdown = UI_Module.AddDropdown(ServePage, "Sushi Fish", sushiFishOptions, false, function(choice)
-        if choice == "No Fish Found" then
-            Serve_Module.RecipeFish["Sushi"] = nil
-        else
-            Serve_Module.RecipeFish["Sushi"] = choice
-        end
-        print("[AutoServe]: Sushi fish set to -> " .. tostring(Serve_Module.RecipeFish["Sushi"]))
-    end)
+    UI_Module.AddSectionLabel(ServePage, "VIP TARGETING")
     
-    -- Refresh fish lists button
-    local RefreshServeFishBtn = Instance.new("TextButton", ServePage)
-    RefreshServeFishBtn.Size = UDim2.new(0.95, 0, 0, 30)
-    RefreshServeFishBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    RefreshServeFishBtn.Text = "Refresh Fish Lists"
-    RefreshServeFishBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    RefreshServeFishBtn.Font = Enum.Font.GothamMedium
-    RefreshServeFishBtn.TextSize = 13
-    Instance.new("UICorner", RefreshServeFishBtn).CornerRadius = UDim.new(0, 6)
-    
-    RefreshServeFishBtn.MouseButton1Click:Connect(function()
-        RefreshServeFishBtn.Text = "Refreshing..."
-        task.spawn(function()
-            local available = getAvailableFish()
-            sashimiDropdown.Refresh(available)
-            nigiriDropdown.Refresh(available)
-            sushiDropdown.Refresh(available)
-            RefreshServeFishBtn.Text = "Refresh Fish Lists"
-        end)
-    end)
-    
-    local ClearServeBtn = Instance.new("TextButton", ServePage)
-    ClearServeBtn.Size = UDim2.new(0.95, 0, 0, 30)
-    ClearServeBtn.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
-    ClearServeBtn.Text = "Clear Selection"
-    ClearServeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    ClearServeBtn.Font = Enum.Font.GothamMedium
-    ClearServeBtn.TextSize = 13
-    Instance.new("UICorner", ClearServeBtn).CornerRadius = UDim.new(0, 6)
-    
-    ClearServeBtn.MouseButton1Click:Connect(function()
-        Serve_Module.RecipeFish["Sashimi"] = nil
-        Serve_Module.RecipeFish["Nigiri"] = nil
-        Serve_Module.RecipeFish["Sushi"] = nil
-        sashimiDropdown.Refresh({"No Fish Found"})
-        nigiriDropdown.Refresh({"No Fish Found"})
-        sushiDropdown.Refresh({"No Fish Found"})
-        Serve_Module.Stop()
-        print("[AutoServe]: Selection cleared")
+    UI_Module.AddDropdown(ServePage, "Select VIPs to Target", {"Rich Guy", "Ninja", "Food Critic", "Sushi Chef"}, true, function(choices)
+        Serve_Module.Config.SelectedVIPs = choices
+        print("[AutoServe]: Targeting VIPs -> " .. table.concat(choices, ", "))
     end)
     
     -------------------------------------------
