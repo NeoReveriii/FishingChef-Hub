@@ -343,21 +343,16 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Modul
     
     UI_Module.AddSectionLabel(UtilsPage, "ANTI-AFK")
     
-    UI_Module.AddNumberInput(
-        UtilsPage,
-        "Action Interval (seconds)",
-        30,   -- default
-        10,   -- minimum 10s
-        300,  -- maximum 5 minutes
-        function(value)
-            AntiAfk_Module.Interval = value
-            print("[AntiAfk]: Interval set to " .. value .. "s")
-        end
-    )
+    UI_Module.AddToggle(UtilsPage, "Anti-Idle (Prevent AFK Kick)", function(state)
+        if state then AntiAfk_Module.EnableAntiIdle() else AntiAfk_Module.DisableAntiIdle() end
+    end)
     
-    UI_Module.AddToggle(UtilsPage, "Enable Anti-AFK", function(state)
-        AntiAfk_Module.Enabled = state
-        if state then AntiAfk_Module.Start() else AntiAfk_Module.Stop() end
+    UI_Module.AddToggle(UtilsPage, "Anti-Kick (Block LocalScript Kicks)", function(state)
+        if state then AntiAfk_Module.EnableAntiKick() else AntiAfk_Module.DisableAntiKick() end
+    end)
+    
+    UI_Module.AddToggle(UtilsPage, "Anti-Teleport (Block Server TP)", function(state)
+        if state then AntiAfk_Module.EnableAntiTeleport() else AntiAfk_Module.DisableAntiTeleport() end
     end)
     
     -------------------------------------------
@@ -377,7 +372,7 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Modul
         Fish_Module.Stop()
         Sell_Module.Stop()
         Serve_Module.Stop()
-        AntiAfk_Module.Stop()
+        AntiAfk_Module.StopAll()
         if PortableMenu then PortableMenu.Destroy() end
     end)
     
