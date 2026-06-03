@@ -76,6 +76,8 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Modul
     -------------------------------------------
     -- TAB 2: Shop
     -------------------------------------------
+    UI_Module.AddSectionLabel(SellPage, "AUTO SELL")
+
     -- Multi-select dropdown – starts empty, populated by FetchAllFishTypes()
     local sellDropdown = UI_Module.AddDropdown(
         SellPage,
@@ -132,7 +134,7 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Modul
         end
     )
 
-    UI_Module.AddToggle(SellPage, "Enable Auto Sell Engine", function(state)
+    UI_Module.AddToggle(SellPage, "Auto Sell", function(state)
         Sell_Module.Enabled = state
         if state then Sell_Module.Start() else Sell_Module.Stop() end
     end)
@@ -147,7 +149,7 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Modul
     end)
     
     local PortableMenu = nil
-    UI_Module.AddToggle(TeleportPage, "Enable Portable Teleport Menu", function(state)
+    UI_Module.AddToggle(TeleportPage, "Teleport Menu", function(state)
         if state then
             PortableMenu = UI_Module.CreatePortableDropdown("Teleport", locationNames, function(choice)
                 Teleport_Module.To(choice)

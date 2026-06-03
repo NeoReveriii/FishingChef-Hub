@@ -23,7 +23,7 @@ function GUI.Create()
     local MaximizeAnchor = Instance.new("TextButton")
     MaximizeAnchor.Name = "MaximizeAnchor"
     MaximizeAnchor.Size = UDim2.new(0, 50, 0, 50)
-    MaximizeAnchor.Position = UDim2.new(0, 20, 0.5, -25)
+    MaximizeAnchor.Position = UDim2.new(0, 20, 0, 20)
     MaximizeAnchor.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
     MaximizeAnchor.Text = "HUB"
     MaximizeAnchor.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -56,7 +56,7 @@ function GUI.Create()
     local AppTitle = Instance.new("TextLabel", Sidebar)
     AppTitle.Size = UDim2.new(1, 0, 0, 45)
     AppTitle.BackgroundTransparency = 1
-    AppTitle.Text = "   Kilabot Hub v.3"
+    AppTitle.Text = "   Kilabot Hub v.3a"
     AppTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
     AppTitle.Font = Enum.Font.GothamBold
     AppTitle.TextSize = 14
@@ -178,8 +178,8 @@ function GUI.Create()
         Label.TextXAlignment = Enum.TextXAlignment.Left
         
         local Switch = Instance.new("TextButton", ToggleFrame)
-        Switch.Size = UDim2.new(0, 45, 0, 22)
-        Switch.Position = UDim2.new(1, -55, 0.5, -11)
+        Switch.Size = UDim2.new(0, 36, 0, 20)
+        Switch.Position = UDim2.new(1, -46, 0.5, -10)
         Switch.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
         Switch.Text = ""
         Instance.new("UICorner", Switch).CornerRadius = UDim.new(1, 0)
@@ -223,13 +223,25 @@ function GUI.Create()
         MainBtn.Size = UDim2.new(0, 120, 0, 26)
         MainBtn.Position = UDim2.new(1, -130, 0.5, -13)
         MainBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
-        MainBtn.Text = "--  ↕"
+        MainBtn.Text = "--"
         MainBtn.TextColor3 = Color3.fromRGB(160, 160, 160)
         MainBtn.Font = Enum.Font.GothamMedium
-        MainBtn.TextSize = 12
+        MainBtn.TextSize = 14
         MainBtn.TextTruncate = Enum.TextTruncate.AtEnd
-        MainBtn.TextXAlignment = Enum.TextXAlignment.Right
+        MainBtn.TextXAlignment = Enum.TextXAlignment.Left
+        MainBtn.TextPadding = UDim.new(0, 8, 0, 0)
         Instance.new("UICorner", MainBtn).CornerRadius = UDim.new(0, 5)
+        
+        -- Add icon on right side
+        local IconLabel = Instance.new("TextLabel", MainBtn)
+        IconLabel.Size = UDim2.new(0, 20, 1, 0)
+        IconLabel.Position = UDim2.new(1, -20, 0, 0)
+        IconLabel.BackgroundTransparency = 1
+        IconLabel.Text = "▼"
+        IconLabel.TextColor3 = Color3.fromRGB(160, 160, 160)
+        IconLabel.Font = Enum.Font.GothamMedium
+        IconLabel.TextSize = 14
+        IconLabel.TextXAlignment = Enum.TextXAlignment.Center
         
         local FloatingList = Instance.new("Frame")
         FloatingList.Name = "FloatingDropdown"
@@ -267,9 +279,9 @@ function GUI.Create()
                 if v then table.insert(keys, k) end 
             end
             if #keys > 0 then
-                MainBtn.Text = table.concat(keys, ", ") .. "  ↕"
+                MainBtn.Text = table.concat(keys, ", ")
             else
-                MainBtn.Text = "--  ↕"
+                MainBtn.Text = "--"
             end
         end
         
@@ -318,7 +330,7 @@ function GUI.Create()
                         for k, v in pairs(selectedItems) do if v then table.insert(activeKeys, k) end end
                         if callback then callback(activeKeys) end
                     else
-                        MainBtn.Text = tostring(option) .. "  ↕"
+                        MainBtn.Text = tostring(option)
                         FloatingList.Visible = false
                         if callback then callback(option) end
                     end
@@ -476,28 +488,19 @@ function GUI.Create()
         }
     end
 
-    -- ── Section label (visual divider with text) ──────────────────────────
+    -- ── Section Header (Category Title/Group Label) ───────────────────────
     function GUI.AddSectionLabel(parentPage, text)
         local LabelFrame = Instance.new("Frame", parentPage)
-        LabelFrame.Size = UDim2.new(0.95, 0, 0, 24)
+        LabelFrame.Size = UDim2.new(0.95, 0, 0, 30)
         LabelFrame.BackgroundTransparency = 1
         
-        local Line = Instance.new("Frame", LabelFrame)
-        Line.Size = UDim2.new(1, 0, 0, 1)
-        Line.Position = UDim2.new(0, 0, 0.5, 0)
-        Line.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-        Line.BorderSizePixel = 0
-        
         local Lbl = Instance.new("TextLabel", LabelFrame)
-        Lbl.Size = UDim2.new(1, -10, 1, 0)
-        Lbl.Position = UDim2.new(0, 8, 0, 0)
-        Lbl.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-        Lbl.BackgroundTransparency = 0
-        Lbl.AutomaticSize = Enum.AutomaticSize.X
-        Lbl.Text = "  " .. text .. "  "
-        Lbl.TextColor3 = Color3.fromRGB(120, 120, 120)
-        Lbl.Font = Enum.Font.GothamMedium
-        Lbl.TextSize = 11
+        Lbl.Size = UDim2.new(1, 0, 1, 0)
+        Lbl.BackgroundTransparency = 1
+        Lbl.Text = text
+        Lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+        Lbl.Font = Enum.Font.GothamBold
+        Lbl.TextSize = 14
         Lbl.TextXAlignment = Enum.TextXAlignment.Left
     end
 
