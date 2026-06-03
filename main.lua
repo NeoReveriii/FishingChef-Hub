@@ -295,6 +295,26 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Modul
         end)
     end)
     
+    local ClearServeBtn = Instance.new("TextButton", ServePage)
+    ClearServeBtn.Size = UDim2.new(0.95, 0, 0, 30)
+    ClearServeBtn.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
+    ClearServeBtn.Text = "Clear Selection"
+    ClearServeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ClearServeBtn.Font = Enum.Font.GothamMedium
+    ClearServeBtn.TextSize = 13
+    Instance.new("UICorner", ClearServeBtn).CornerRadius = UDim.new(0, 6)
+    
+    ClearServeBtn.MouseButton1Click:Connect(function()
+        Serve_Module.RecipeFish["Sashimi"] = nil
+        Serve_Module.RecipeFish["Nigiri"] = nil
+        Serve_Module.RecipeFish["Sushi"] = nil
+        sashimiDropdown.Refresh({"No Fish Found"})
+        nigiriDropdown.Refresh({"No Fish Found"})
+        sushiDropdown.Refresh({"No Fish Found"})
+        Serve_Module.Stop()
+        print("[AutoServe]: Selection cleared")
+    end)
+    
     -------------------------------------------
     -- TAB 6: Utilities
     -------------------------------------------
