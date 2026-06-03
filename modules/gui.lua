@@ -56,7 +56,7 @@ function GUI.Create()
     local AppTitle = Instance.new("TextLabel", Sidebar)
     AppTitle.Size = UDim2.new(1, 0, 0, 45)
     AppTitle.BackgroundTransparency = 1
-    AppTitle.Text = "   Kilabot Hub v.3a"
+    AppTitle.Text = "   Kilabot Hub v.3b"
     AppTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
     AppTitle.Font = Enum.Font.GothamBold
     AppTitle.TextSize = 14
@@ -124,6 +124,11 @@ function GUI.Create()
         
         local PageLayout = Instance.new("UIListLayout", PageFrame)
         PageLayout.Padding = UDim.new(0, 10)
+        
+        -- Automatically update CanvasSize when content changes
+        PageLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+            PageFrame.CanvasSize = UDim2.new(0, 0, 0, PageLayout.AbsoluteContentSize.Y + 20)
+        end)
         
         local TabBtn = Instance.new("TextButton", NavList)
         TabBtn.Size = UDim2.new(0.9, 0, 0, 32)
