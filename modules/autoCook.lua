@@ -125,13 +125,22 @@ function AutoCook.Start()
                         StartCutSession:InvokeServer()
                         task.wait(0.2)
                         
-                        -- 3.3: Cut Actions (2 Legendary, 1 Amazing as requested)
-                        CutAction:FireServer(1)
-                        task.wait(0.1)
-                        CutAction:FireServer(2)
-                        task.wait(0.1)
-                        CutAction:FireServer(3)
-                        task.wait(0.2)
+                        -- 3.3: Cut Actions - Different sequence for Nigiri (2 cuts) vs Sashimi (3 cuts)
+                        if AutoCook.SelectedRecipe == "Nigiri" then
+                            -- Nigiri requires 2 cuts
+                            CutAction:FireServer(1)
+                            task.wait(0.1)
+                            CutAction:FireServer(2)
+                            task.wait(0.2)
+                        else
+                            -- Sashimi requires 3 cuts
+                            CutAction:FireServer(1)
+                            task.wait(0.1)
+                            CutAction:FireServer(2)
+                            task.wait(0.1)
+                            CutAction:FireServer(3)
+                            task.wait(0.2)
+                        end
                         
                         -- 3.4: Server Animations
                         local cuttingBoard = nil
@@ -161,7 +170,7 @@ function AutoCook.Start()
                             Name = "Fish Filet",
                             Amount = 1,
                             ID = targetFishItem.ID or 15,
-                            Data = 5, -- 🌟 5 Forces Legendary Quality (3 Perfect Cuts)
+                            Data = (AutoCook.SelectedRecipe == "Nigiri") and 4 or 5, -- 4 for Nigiri, 5 for Sashimi
                             Value = 0
                         }
                         

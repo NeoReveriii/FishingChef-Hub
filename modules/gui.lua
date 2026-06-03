@@ -231,6 +231,10 @@ function GUI.Create()
         MainBtn.TextXAlignment = Enum.TextXAlignment.Left
         Instance.new("UICorner", MainBtn).CornerRadius = UDim.new(0, 5)
         
+        local TextPadding = Instance.new("TextPadding", MainBtn)
+        TextPadding.PaddingLeft = 8
+        TextPadding.PaddingRight = 8
+        
         local FloatingList = Instance.new("Frame")
         FloatingList.Name = "FloatingDropdown"
         FloatingList.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
