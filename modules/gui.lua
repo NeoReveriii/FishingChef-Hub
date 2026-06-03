@@ -223,25 +223,13 @@ function GUI.Create()
         MainBtn.Size = UDim2.new(0, 120, 0, 26)
         MainBtn.Position = UDim2.new(1, -130, 0.5, -13)
         MainBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
-        MainBtn.Text = "--"
+        MainBtn.Text = "--  ▼"
         MainBtn.TextColor3 = Color3.fromRGB(160, 160, 160)
         MainBtn.Font = Enum.Font.GothamMedium
         MainBtn.TextSize = 14
         MainBtn.TextTruncate = Enum.TextTruncate.AtEnd
         MainBtn.TextXAlignment = Enum.TextXAlignment.Left
-        MainBtn.TextPadding = UDim.new(0, 8, 0, 0)
         Instance.new("UICorner", MainBtn).CornerRadius = UDim.new(0, 5)
-        
-        -- Add icon on right side
-        local IconLabel = Instance.new("TextLabel", MainBtn)
-        IconLabel.Size = UDim2.new(0, 20, 1, 0)
-        IconLabel.Position = UDim2.new(1, -20, 0, 0)
-        IconLabel.BackgroundTransparency = 1
-        IconLabel.Text = "▼"
-        IconLabel.TextColor3 = Color3.fromRGB(160, 160, 160)
-        IconLabel.Font = Enum.Font.GothamMedium
-        IconLabel.TextSize = 14
-        IconLabel.TextXAlignment = Enum.TextXAlignment.Center
         
         local FloatingList = Instance.new("Frame")
         FloatingList.Name = "FloatingDropdown"
@@ -279,9 +267,9 @@ function GUI.Create()
                 if v then table.insert(keys, k) end 
             end
             if #keys > 0 then
-                MainBtn.Text = table.concat(keys, ", ")
+                MainBtn.Text = table.concat(keys, ", ") .. "  ▼"
             else
-                MainBtn.Text = "--"
+                MainBtn.Text = "--  ▼"
             end
         end
         
@@ -330,7 +318,7 @@ function GUI.Create()
                         for k, v in pairs(selectedItems) do if v then table.insert(activeKeys, k) end end
                         if callback then callback(activeKeys) end
                     else
-                        MainBtn.Text = tostring(option)
+                        MainBtn.Text = tostring(option) .. "  ▼"
                         FloatingList.Visible = false
                         if callback then callback(option) end
                     end
