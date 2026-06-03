@@ -67,7 +67,7 @@ function AutoServe.Start()
         
         -- Remote Functions
         local RequestFishData = FishRF:WaitForChild("RequestFishData")
-        local RequestRestaurantData = FishRF:WaitForChild("RequestRestaurantData")
+        local RequestRestaurauntData = FishRF:WaitForChild("RequestRestaurauntData")
         local Cook = FishRF:WaitForChild("Cook")
         
         debugLog("Successfully loaded all required remotes")
@@ -110,7 +110,7 @@ function AutoServe.Start()
                         debugLog("Successfully cooked food, now serving customer")
                         -- Request restaurant data to equip plate
                         pcall(function()
-                            RequestRestaurantData:InvokeServer()
+                            RequestRestaurauntData:InvokeServer()
                             debugLog("Requested restaurant data (plate equipped)")
                             task.wait(0.2)
                         end)
