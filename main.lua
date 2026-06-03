@@ -8,6 +8,7 @@ local TELE_URL = "https://raw.githubusercontent.com/"..USERNAME.."/"..REPO.."/ma
 local FISH_URL = "https://raw.githubusercontent.com/"..USERNAME.."/"..REPO.."/main/modules/autoFish.lua" .. cb
 local SELL_URL = "https://raw.githubusercontent.com/"..USERNAME.."/"..REPO.."/main/modules/autoSell.lua" .. cb
 local UTIL_URL = "https://raw.githubusercontent.com/"..USERNAME.."/"..REPO.."/main/modules/utilities.lua" .. cb
+local SERVE_URL = "https://raw.githubusercontent.com/"..USERNAME.."/"..REPO.."/main/modules/autoServe.lua" .. cb
 
 local function fetch(url)
     local success, result = pcall(function() return game:HttpGet(url) end)
@@ -21,8 +22,9 @@ local Teleport_Module = fetch(TELE_URL)
 local Fish_Module     = fetch(FISH_URL)
 local Sell_Module     = fetch(SELL_URL)
 local Util_Module     = fetch(UTIL_URL)
+local Serve_Module    = fetch(SERVE_URL)
 
-if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Module and Util_Module then
+if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Module and Util_Module and Serve_Module then
     -- Run layout environment setup
     local App = UI_Module.Create()
     
@@ -31,6 +33,7 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Modul
     local SellPage     = UI_Module.AddTab("Shop")
     local TeleportPage = UI_Module.AddTab("Teleport")
     local SettingsPage = UI_Module.AddTab("Auto Fishing")
+    local ServePage    = UI_Module.AddTab("Auto Serve")
     local UtilsPage    = UI_Module.AddTab("Utilities")
     local ConfigPage   = UI_Module.AddTab("Config")
     
@@ -215,7 +218,85 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Modul
     end)
     
     -------------------------------------------
-    -- TAB 5: Utilities
+    -- TAB 5: Auto Serve
+    -------------------------------------------
+    UI_Module.AddSectionLabel(ServePage, "CUSTOMER AUTOMATION")
+    
+    UI_Module.AddToggle(ServePage, "Enable Auto Serve", function(state)
+        Serve_Module.Enabled = state
+        if state then Serve_Module.Start() else Serve_Module.Stop() end
+    end)
+    
+    UI_Module.AddSectionLabel(ServePage, "FISH SELECTION PER RECIPE")
+    
+    -- Get available fish for dropdowns
+    local function getAvailableFish()
+        local success, inventory = pcall(function()
+            return Logic_Module.GetAvailableFish()
+        end)
+        if success and inventory and #inventory > 0 then
+            return inventory
+        else
+            return {"No Fish Found"}
+        end
+    end
+    
+    -- Sashimi fish selection
+    local sashimiFishOptions = getAvailableFish()
+    local sashimiDropdown = UI_Module.AddDropdown(ServePage, "Sashimi Fish", sashimiFishOptions, false, function(choice)
+        if choice == "No Fish Found" then
+            Serve_Module.RecipeFish["Sashimi"] = nil
+        else
+            Serve_Module.RecipeFish["Sashimi"] = choice
+        end
+        print("[AutoServe]: Sashimi fish set to -> " .. tostring(Serve_Module.RecipeFish["Sashimi"]))
+    end)
+    
+    -- Nigiri fish selection
+    local nigiriFishOptions = getAvailableFish()
+    local nigiriDropdown = UI_Module.AddDropdown(ServePage, "Nigiri Fish", nigiriFishOptions, false, function(choice)
+        if choice == "No Fish Found" then
+            Serve_Module.RecipeFish["Nigiri"] = nil
+        else
+            Serve_Module.RecipeFish["Nigiri"] = choice
+        end
+        print("[AutoServe]: Nigiri fish set to -> " .. tostring(Serve_Module.RecipeFish["Nigiri"]))
+    end)
+    
+    -- Sushi fish selection
+    local sushiFishOptions = getAvailableFish()
+    local sushiDropdown = UI_Module.AddDropdown(ServePage, "Sushi Fish", sushiFishOptions, false, function(choice)
+        if choice == "No Fish Found" then
+            Serve_Module.RecipeFish["Sushi"] = nil
+        else
+            Serve_Module.RecipeFish["Sushi"] = choice
+        end
+        print("[AutoServe]: Sushi fish set to -> " .. tostring(Serve_Module.RecipeFish["Sushi"]))
+    end)
+    
+    -- Refresh fish lists button
+    local RefreshServeFishBtn = Instance.new("TextButton", ServePage)
+    RefreshServeFishBtn.Size = UDim2.new(0.95, 0, 0, 30)
+    RefreshServeFishBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    RefreshServeFishBtn.Text = "Refresh Fish Lists"
+    RefreshServeFishBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    RefreshServeFishBtn.Font = Enum.Font.GothamMedium
+    RefreshServeFishBtn.TextSize = 13
+    Instance.new("UICorner", RefreshServeFishBtn).CornerRadius = UDim.new(0, 6)
+    
+    RefreshServeFishBtn.MouseButton1Click:Connect(function()
+        RefreshServeFishBtn.Text = "Refreshing..."
+        task.spawn(function()
+            local available = getAvailableFish()
+            sashimiDropdown.Refresh(available)
+            nigiriDropdown.Refresh(available)
+            sushiDropdown.Refresh(available)
+            RefreshServeFishBtn.Text = "Refresh Fish Lists"
+        end)
+    end)
+    
+    -------------------------------------------
+    -- TAB 6: Utilities
     -------------------------------------------
     UI_Module.AddSectionLabel(UtilsPage, "PERFORMANCE")
     
@@ -239,7 +320,7 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Modul
     end)
     
     -------------------------------------------
-    -- TAB 6: Config
+    -- TAB 7: Config
     -------------------------------------------
     UI_Module.AddSectionLabel(ConfigPage, "SETTINGS")
     
@@ -254,6 +335,7 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Modul
         Logic_Module.Stop()
         Fish_Module.Stop()
         Sell_Module.Stop()
+        Serve_Module.Stop()
         if PortableMenu then PortableMenu.Destroy() end
     end)
     
