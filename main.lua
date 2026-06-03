@@ -7,6 +7,7 @@ local LOOP_URL = "https://raw.githubusercontent.com/"..USERNAME.."/"..REPO.."/ma
 local TELE_URL = "https://raw.githubusercontent.com/"..USERNAME.."/"..REPO.."/main/modules/teleport.lua" .. cb
 local FISH_URL = "https://raw.githubusercontent.com/"..USERNAME.."/"..REPO.."/main/modules/autoFish.lua" .. cb
 local SELL_URL = "https://raw.githubusercontent.com/"..USERNAME.."/"..REPO.."/main/modules/autoSell.lua" .. cb
+local UTIL_URL = "https://raw.githubusercontent.com/"..USERNAME.."/"..REPO.."/main/modules/utilities.lua" .. cb
 
 local function fetch(url)
     local success, result = pcall(function() return game:HttpGet(url) end)
@@ -19,8 +20,9 @@ local Logic_Module    = fetch(LOOP_URL)
 local Teleport_Module = fetch(TELE_URL)
 local Fish_Module     = fetch(FISH_URL)
 local Sell_Module     = fetch(SELL_URL)
+local Util_Module     = fetch(UTIL_URL)
 
-if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Module then
+if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Module and Util_Module then
     -- Run layout environment setup
     local App = UI_Module.Create()
     
@@ -29,6 +31,8 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Modul
     local SellPage     = UI_Module.AddTab("Shop")
     local TeleportPage = UI_Module.AddTab("Teleport")
     local SettingsPage = UI_Module.AddTab("Auto Fishing")
+    local UtilsPage    = UI_Module.AddTab("Utilities")
+    local ConfigPage   = UI_Module.AddTab("Config")
     
     -------------------------------------------
     -- TAB 1: Auto Cooking
@@ -314,6 +318,28 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Modul
 
             RunCmdBtn.Text = "⚡ Try RunCommand giveFish"
         end)
+    end)
+    
+    -------------------------------------------
+    -- TAB 5: Utilities
+    -------------------------------------------
+    UI_Module.AddSectionLabel(UtilsPage, "PERFORMANCE")
+    
+    UI_Module.AddToggle(UtilsPage, "FPS Boost", function(state)
+        if state then
+            Util_Module.EnableFPSBoost()
+        else
+            Util_Module.DisableFPSBoost()
+        end
+    end)
+    
+    -------------------------------------------
+    -- TAB 6: Config
+    -------------------------------------------
+    UI_Module.AddSectionLabel(ConfigPage, "SETTINGS")
+    
+    UI_Module.AddToggle(ConfigPage, "Coming Soon", function(state)
+        print("[Config]: Feature coming soon")
     end)
     
     -------------------------------------------
