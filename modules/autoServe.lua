@@ -64,6 +64,7 @@ function AutoServe.Start()
         
         -- Remote Events
         local StoreFood = FishRE:WaitForChild("StoreFood")
+        local EquipPlate = FishRE:WaitForChild("EquipPlate")
         
         -- Remote Functions
         local RequestFishData = FishRF:WaitForChild("RequestFishData")
@@ -71,6 +72,13 @@ function AutoServe.Start()
         local Cook = FishRF:WaitForChild("Cook")
         
         debugLog("Successfully loaded all required remotes")
+        
+        -- Equip plate at start
+        pcall(function()
+            EquipPlate:FireServer()
+            debugLog("Plate equipped at startup")
+            print("[AutoServe]: Plate equipped at startup")
+        end)
         
         while AutoServe.Enabled do
             pcall(function()
@@ -108,10 +116,10 @@ function AutoServe.Start()
                     
                     if success then
                         debugLog("Successfully cooked food, now serving customer")
-                        -- Request restaurant data to equip plate
+                        -- Equip plate before serving
                         pcall(function()
-                            RequestRestaurauntData:InvokeServer()
-                            debugLog("Requested restaurant data (plate equipped)")
+                            EquipPlate:FireServer()
+                            debugLog("Plate equipped before serving")
                             task.wait(0.2)
                         end)
                         -- Serve the food

@@ -71,7 +71,7 @@ function AutoFish.Start()
                 
                 -- 3. INSTANT CATCH ATTEMPT - Try to catch immediately after cast
                 -- This may not work if server requires minimum bite time
-                task.wait(2.8) -- Aggressive reduction - testing instant catch
+                task.wait(3) -- Aggressive reduction - testing instant catch
                 
                 -- 4. Log step and resolve minigame as a win
                 LogStep:InvokeServer(4)
