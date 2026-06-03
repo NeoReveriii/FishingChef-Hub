@@ -25,13 +25,13 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Modul
     local App = UI_Module.Create()
     
     -- Exact Sidebar Tab Order requested
-    local CookPage     = UI_Module.AddTab("Chef Automation")
-    local SellPage     = UI_Module.AddTab("Auto Sell")
-    local TeleportPage = UI_Module.AddTab("Map Teleports")
-    local SettingsPage = UI_Module.AddTab("Utilities and config")
+    local CookPage     = UI_Module.AddTab("Auto Cooking")
+    local SellPage     = UI_Module.AddTab("Shop")
+    local TeleportPage = UI_Module.AddTab("Teleport")
+    local SettingsPage = UI_Module.AddTab("Auto Fishing")
     
     -------------------------------------------
-    -- TAB 1: Chef Automation
+    -- TAB 1: Auto Cooking
     -------------------------------------------
     UI_Module.AddDropdown(CookPage, "Target Recipe Cuisine", {"Sashimi"}, false, function(choice)
         Logic_Module.SelectedRecipe = choice
@@ -74,10 +74,8 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Modul
     end)
     
     -------------------------------------------
-    -- TAB 2: Auto Sell
+    -- TAB 2: Shop
     -------------------------------------------
-    UI_Module.AddSectionLabel(SellPage, "Fish to Sell")
-
     -- Multi-select dropdown – starts empty, populated by FetchAllFishTypes()
     local sellDropdown = UI_Module.AddDropdown(
         SellPage,
@@ -122,8 +120,6 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Modul
     -- Auto-populate on load
     refreshSellFishList(nil)
 
-    UI_Module.AddSectionLabel(SellPage, "Timer Configuration")
-
     UI_Module.AddNumberInput(
         SellPage,
         "Sell Interval (seconds)",
@@ -136,15 +132,13 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Modul
         end
     )
 
-    UI_Module.AddSectionLabel(SellPage, "Engine")
-
     UI_Module.AddToggle(SellPage, "Enable Auto Sell Engine", function(state)
         Sell_Module.Enabled = state
         if state then Sell_Module.Start() else Sell_Module.Stop() end
     end)
 
     -------------------------------------------
-    -- TAB 3: Map Teleports
+    -- TAB 3: Teleport
     -------------------------------------------
     local locationNames = Teleport_Module.GetLocationNames()
     
@@ -167,7 +161,7 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Modul
     end)
     
     -------------------------------------------
-    -- TAB 3: Utilities and config
+    -- TAB 4: Auto Fishing
     -------------------------------------------
     Fish_Module.TeleportModule = Teleport_Module
     Fish_Module.RemoteLocation = "None"

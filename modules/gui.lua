@@ -23,9 +23,10 @@ function GUI.Create()
     local MaximizeAnchor = Instance.new("TextButton")
     MaximizeAnchor.Name = "MaximizeAnchor"
     MaximizeAnchor.Size = UDim2.new(0, 50, 0, 50)
-    MaximizeAnchor.Position = UDim2.new(1, -70, 1, -70)
+    MaximizeAnchor.Position = UDim2.new(0, 20, 0.5, -25)
     MaximizeAnchor.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
-    MaximizeAnchor.Text = "Hub"
+    MaximizeAnchor.Text = "HUB"
+    MaximizeAnchor.TextColor3 = Color3.fromRGB(255, 255, 255)
     MaximizeAnchor.TextSize = 14
     MaximizeAnchor.Visible = false
     MaximizeAnchor.Active = true
@@ -55,7 +56,7 @@ function GUI.Create()
     local AppTitle = Instance.new("TextLabel", Sidebar)
     AppTitle.Size = UDim2.new(1, 0, 0, 45)
     AppTitle.BackgroundTransparency = 1
-    AppTitle.Text = "   Kilabot Hub v.2c"
+    AppTitle.Text = "   Kilabot Hub v.3"
     AppTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
     AppTitle.Font = Enum.Font.GothamBold
     AppTitle.TextSize = 14
@@ -105,6 +106,7 @@ function GUI.Create()
 
     local CurrentActiveTab = nil
     local OnTerminateCallback = nil
+    local allFloatingDropdowns = {}
     
     ExitButton.MouseButton1Click:Connect(function()
         if OnTerminateCallback then OnTerminateCallback() end
@@ -134,6 +136,13 @@ function GUI.Create()
         Instance.new("UICorner", TabBtn).CornerRadius = UDim.new(0, 6)
 
         TabBtn.MouseButton1Click:Connect(function()
+            -- Close all open dropdowns when switching tabs
+            for _, dropdown in ipairs(allFloatingDropdowns) do
+                if dropdown and dropdown.Parent then
+                    dropdown.Visible = false
+                end
+            end
+            
             if CurrentActiveTab then
                 CurrentActiveTab.Page.Visible = false
                 game:GetService("TweenService"):Create(CurrentActiveTab.Btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(22, 22, 22), TextColor3 = Color3.fromRGB(160, 160, 160)}):Play()
@@ -196,29 +205,31 @@ function GUI.Create()
 
     function GUI.AddDropdown(parentPage, text, listOptions, multiSelect, callback)
         local DropdownFrame = Instance.new("Frame", parentPage)
-        DropdownFrame.Size = UDim2.new(0.95, 0, 0, 45)
-        DropdownFrame.BackgroundTransparency = 1
+        DropdownFrame.Size = UDim2.new(0.95, 0, 0, 40)
+        DropdownFrame.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
+        Instance.new("UICorner", DropdownFrame).CornerRadius = UDim.new(0, 6)
         
         local Label = Instance.new("TextLabel", DropdownFrame)
-        Label.Size = UDim2.new(0.5, -10, 1, 0)
+        Label.Size = UDim2.new(0.6, 0, 1, 0)
         Label.Position = UDim2.new(0, 10, 0, 0)
         Label.BackgroundTransparency = 1
         Label.Text = text
-        Label.TextColor3 = Color3.fromRGB(200, 200, 200)
+        Label.TextColor3 = Color3.fromRGB(230, 230, 230)
         Label.Font = Enum.Font.GothamMedium
         Label.TextSize = 13
         Label.TextXAlignment = Enum.TextXAlignment.Left
         
         local MainBtn = Instance.new("TextButton", DropdownFrame)
-        MainBtn.Size = UDim2.new(0.5, 0, 0.8, 0)
-        MainBtn.Position = UDim2.new(0.5, 0, 0.1, 0)
+        MainBtn.Size = UDim2.new(0, 120, 0, 26)
+        MainBtn.Position = UDim2.new(1, -130, 0.5, -13)
         MainBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
-        MainBtn.Text = "Select...  ↕"
+        MainBtn.Text = "--  ↕"
         MainBtn.TextColor3 = Color3.fromRGB(160, 160, 160)
         MainBtn.Font = Enum.Font.GothamMedium
         MainBtn.TextSize = 12
         MainBtn.TextTruncate = Enum.TextTruncate.AtEnd
-        Instance.new("UICorner", MainBtn).CornerRadius = UDim.new(0, 6)
+        MainBtn.TextXAlignment = Enum.TextXAlignment.Right
+        Instance.new("UICorner", MainBtn).CornerRadius = UDim.new(0, 5)
         
         local FloatingList = Instance.new("Frame")
         FloatingList.Name = "FloatingDropdown"
@@ -227,6 +238,9 @@ function GUI.Create()
         FloatingList.ZIndex = 100 
         FloatingList.Visible = false
         FloatingList.Parent = ScreenGui 
+        
+        -- Register floating dropdown for tab switching cleanup
+        table.insert(allFloatingDropdowns, FloatingList)
         
         Instance.new("UICorner", FloatingList).CornerRadius = UDim.new(0, 6)
         local Stroke = Instance.new("UIStroke", FloatingList)
@@ -255,7 +269,7 @@ function GUI.Create()
             if #keys > 0 then
                 MainBtn.Text = table.concat(keys, ", ") .. "  ↕"
             else
-                MainBtn.Text = "Select...  ↕"
+                MainBtn.Text = "--  ↕"
             end
         end
         
@@ -389,6 +403,9 @@ function GUI.Create()
         FloatingList.Visible = false
         FloatingList.Parent = ScreenGui 
         
+        -- Register floating dropdown for tab switching cleanup
+        table.insert(allFloatingDropdowns, FloatingList)
+        
         Instance.new("UICorner", FloatingList).CornerRadius = UDim.new(0, 6)
         local Stroke = Instance.new("UIStroke", FloatingList)
         Stroke.Color = Color3.fromRGB(35, 35, 35)
@@ -506,7 +523,7 @@ function GUI.Create()
         InputBox.Position = UDim2.new(1, -78, 0.5, -13)
         InputBox.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
         InputBox.Text = tostring(defaultValue)
-        InputBox.TextColor3 = Color3.fromRGB(46, 204, 113)
+        InputBox.TextColor3 = Color3.fromRGB(255, 255, 255)
         InputBox.Font = Enum.Font.GothamBold
         InputBox.TextSize = 13
         InputBox.ClearTextOnFocus = false
