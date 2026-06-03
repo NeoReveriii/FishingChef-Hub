@@ -3,6 +3,7 @@ local loopThread = nil
 
 -- Shared Configuration States
 AutoServe.Enabled = false
+AutoServe.AutoCookModule = nil -- Reference to AutoCook module for cooking
 
 -- UI Configuration
 AutoServe.Config = {
@@ -252,7 +253,7 @@ local function Phase1_RadarDetection(OpenPlot, RequestRestaurauntData)
 end
 
 -- Phase 2: Smart Fulfillment & Targeted Cooking Chain
-local function Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, targetRecipe, targetFish, EquipPlate, RequestRestaurauntData, Cook)
+local function Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, targetRecipe, targetFish, EquipPlate, RequestRestaurauntData, Cook, AutoCookModule)
     local Players = game:GetService("Players")
     local LocalPlayer = Players.LocalPlayer
     local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
@@ -310,69 +311,44 @@ local function Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, ta
         end
     end
     
-    -- Step 3: Auto-cook from raw fish inventory
-    debugLog("Food not found, attempting to auto-cook with specific fish: " .. targetFish)
-    
-    -- Get raw fish inventory
-    local fishSuccess, fishData = pcall(function()
-        local FishRF = game:GetService("ReplicatedStorage"):WaitForChild("Packages"):WaitForChild("Knit"):WaitForChild("Services"):WaitForChild("Fish"):WaitForChild("RF")
-        local RequestFishData = FishRF:WaitForChild("RequestFishData")
-        return RequestFishData:InvokeServer()
-    end)
-    
-    if fishSuccess and fishData then
-        -- Find the specific fish in inventory (case-insensitive match)
-        for _, fishItem in ipairs(fishData) do
-            local fishName = fishItem.CF or fishItem.Name
-            local fishNameLower = string.lower(fishName)
-            local targetFishLower = string.lower(targetFish)
-            
-            if fishNameLower:find(targetFishLower) then
-                debugLog("Found raw " .. fishName .. " (matching " .. targetFish .. "), cooking...")
-                
-                -- Cook the food with the specified recipe
-                local dataValue = 4 -- Default for Nigiri/Sushi (2 cuts)
-                if targetRecipe == "Sashimi" then
-                    dataValue = 5 -- Sashimi (3 cuts)
-                end
-                
-                local cookPayload = {
-                    CF = fishItem.CF or fishItem.Name,
-                    Name = "Fish Filet",
-                    Amount = 1,
-                    ID = fishItem.ID,
-                    Data = dataValue,
-                    Value = 0
-                }
-                
-                pcall(function()
-                    Cook:InvokeServer(targetRecipe, cookPayload)
-                    debugLog("Cooked " .. targetRecipe .. " with " .. fishName)
-                end)
-                
-                task.wait(0.5)
-                
-                -- Equip and serve
-                pcall(function()
-                    EquipPlate:FireServer({
-                        CF = fishItem.CF or fishItem.Name,
-                        Name = targetFoodName,
-                        Amount = 1,
-                        ID = fishItem.ID,
-                        Data = dataValue,
-                        Value = 0
-                    })
-                end)
-                
-                task.wait(0.3)
-                ServeFood(targetNPC.npc, targetFoodName, targetSlot)
-                return true
-            end
-        end
+    -- Step 3: Auto-cook using AutoCook module
+    if targetFish and AutoCookModule then
+        debugLog("Food not found, attempting to auto-cook with specific fish: " .. targetFish .. " using AutoCook module")
         
-        debugLog("Could not find " .. targetFish .. " in inventory")
+        local cookSuccess = pcall(function()
+            return AutoCookModule.CookSingle(targetRecipe, targetFish)
+        end)
+        
+        if cookSuccess then
+            debugLog("Successfully cooked " .. targetRecipe .. " with " .. targetFish)
+            task.wait(1) -- Wait for food to be added to inventory
+            
+            -- Try to equip and serve the cooked food
+            for _, tool in ipairs(backpack:GetChildren()) do
+                if tool.Name == targetFoodName then
+                    debugLog("Found " .. targetFoodName .. " in hotbar after cooking, equipping...")
+                    character.Humanoid:EquipTool(tool)
+                    task.wait(0.2)
+                    ServeFood(targetNPC.npc, targetFoodName, targetSlot)
+                    return true
+                end
+            end
+            
+            -- Check character for equipped tool
+            for _, tool in ipairs(character:GetChildren()) do
+                if tool:IsA("Tool") and tool.Name == targetFoodName then
+                    debugLog("Found " .. targetFoodName .. " equipped after cooking, serving...")
+                    ServeFood(targetNPC.npc, targetFoodName, targetSlot)
+                    return true
+                end
+            end
+            
+            debugLog("Could not find " .. targetFoodName .. " after cooking")
+        else
+            debugLog("AutoCook failed to cook " .. targetRecipe .. " with " .. targetFish)
+        end
     else
-        debugLog("Failed to fetch fish inventory")
+        debugLog("No target fish specified or AutoCook module not available")
     end
     
     debugLog("Failed to fulfill order for: " .. targetFoodName)
@@ -509,7 +485,7 @@ function AutoServe.Start()
                 
                 -- Phase 2: Smart Fulfillment
                 if targetNPC and targetFoodName then
-                    local success = Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, targetRecipe, targetFish, EquipPlate, RequestRestaurauntData, Cook)
+                    local success = Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, targetRecipe, targetFish, EquipPlate, RequestRestaurauntData, Cook, AutoServe.AutoCookModule)
                     if success then
                         debugLog("Successfully served customer")
                         task.wait(2)

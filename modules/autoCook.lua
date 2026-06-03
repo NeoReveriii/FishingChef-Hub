@@ -46,6 +46,133 @@ function AutoCook.GetAvailableFish()
     return uniqueFish
 end
 
+-- Single Cook Function - Cooks one fish with specific recipe (for use by other modules)
+function AutoCook.CookSingle(recipe, fishName)
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    local Players = game:GetService("Players")
+    local LocalPlayer = Players.LocalPlayer
+    
+    local Packages = ReplicatedStorage:WaitForChild("Packages", 5)
+    if not Packages then
+        warn("[AutoCook]: 'Packages' was not found in ReplicatedStorage.")
+        return false
+    end
+    
+    local Knit = Packages:WaitForChild("Knit", 5)
+    local Services = Knit:WaitForChild("Services", 5)
+    
+    -- Analytics Services
+    local AnalyticsRF = Services:WaitForChild("Analytics"):WaitForChild("RF")
+    local LogStep = AnalyticsRF:WaitForChild("LogStep")
+    
+    -- Fish Services
+    local FishServices = Services:WaitForChild("Fish")
+    local FishRF = FishServices:WaitForChild("RF")
+    local FishRE = FishServices:WaitForChild("RE")
+    
+    -- Remote Functions
+    local RequestFishData = FishRF:WaitForChild("RequestFishData")
+    local StartCutSession = FishRF:WaitForChild("StartCutSession")
+    local CutFish = FishRF:WaitForChild("CutFish")
+    local Cook = FishRF:WaitForChild("Cook")
+    local RequestRestaurantData = FishRF:WaitForChild("RequestRestaurauntData")
+    
+    -- Remote Events
+    local CutAction = FishRE:WaitForChild("CutAction")
+    local ServerAnims = FishRE:WaitForChild("ServerAnims")
+    
+    -- Get inventory to find the fish
+    local success, inventory = pcall(function()
+        return RequestFishData:InvokeServer()
+    end)
+    
+    if not success or not inventory then
+        warn("[AutoCook]: Failed to fetch inventory.")
+        return false
+    end
+    
+    -- Find the specific fish in inventory
+    local targetFishItem = nil
+    for _, item in pairs(inventory) do
+        local itemName = item.CF or item.Name
+        if string.lower(itemName):find(string.lower(fishName)) then
+            targetFishItem = item
+            break
+        end
+    end
+    
+    if not targetFishItem then
+        warn("[AutoCook]: Could not find fish: " .. fishName)
+        return false
+    end
+    
+    -- Execute the cooking sequence
+    local cookSuccess = pcall(function()
+        -- Log Step
+        LogStep:InvokeServer(7)
+        
+        -- Start Cut Session
+        StartCutSession:InvokeServer()
+        task.wait(0.2)
+        
+        -- Cut Actions - Different sequence for Nigiri/Sushi (2 cuts) vs Sashimi (3 cuts)
+        if recipe == "Nigiri" or recipe == "Sushi" then
+            CutAction:FireServer(1)
+            task.wait(0.1)
+            CutAction:FireServer(2)
+            task.wait(0.2)
+        else
+            CutAction:FireServer(1)
+            task.wait(0.1)
+            CutAction:FireServer(2)
+            task.wait(0.1)
+            CutAction:FireServer(3)
+            task.wait(0.2)
+        end
+        
+        -- Server Animations
+        local cuttingBoard = nil
+        pcall(function()
+            cuttingBoard = workspace:WaitForChild("Code", 2):WaitForChild("Plots", 2):WaitForChild(LocalPlayer.Name, 2):WaitForChild("STALL", 2):WaitForChild("CookingStation", 2):WaitForChild("CuttingBoard", 2)
+        end)
+        
+        if cuttingBoard then
+            ServerAnims:FireServer("CuttingBoard", cuttingBoard, false)
+        end
+        task.wait(0.2)
+        
+        -- Cut Fish
+        local fishIdOrWeight = targetFishItem.ID or 1767
+        local floatVal = 4.339033467350943 
+        CutFish:InvokeServer(fishIdOrWeight, floatVal)
+        task.wait(0.2)
+        
+        -- Request Restaurant Data
+        RequestRestaurantData:InvokeServer()
+        task.wait(0.2)
+        
+        -- Cook Process
+        local cookPayload = {
+            CF = targetFishItem.CF or fishName,
+            Name = "Fish Filet",
+            Amount = 1,
+            ID = targetFishItem.ID or 15,
+            Data = (recipe == "Nigiri" or recipe == "Sushi") and 4 or 5,
+            Value = 0
+        }
+        
+        Cook:InvokeServer(recipe, cookPayload, floatVal)
+        print("[AutoCook]: Successfully cooked " .. recipe .. " with " .. fishName)
+    end)
+    
+    if cookSuccess then
+        return true
+    else
+        warn("[AutoCook]: Failed to cook " .. recipe .. " with " .. fishName)
+        return false
+    end
+end
+
 -- Background Task Execution Core Loop
 function AutoCook.Start()
     if loopThread then task.cancel(loopThread) end

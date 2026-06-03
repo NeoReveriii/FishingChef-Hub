@@ -248,6 +248,9 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Modul
         print("[AutoServe]: Targeting VIPs -> " .. table.concat(choices, ", "))
     end)
     
+    -- Pass AutoCook module to AutoServe for cooking integration
+    Serve_Module.AutoCookModule = Logic_Module
+    
     -------------------------------------------
     -- TAB 6: Utilities
     -------------------------------------------
