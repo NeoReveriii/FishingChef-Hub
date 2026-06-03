@@ -9,6 +9,7 @@ local FISH_URL = "https://raw.githubusercontent.com/"..USERNAME.."/"..REPO.."/ma
 local SELL_URL = "https://raw.githubusercontent.com/"..USERNAME.."/"..REPO.."/main/modules/autoSell.lua" .. cb
 local UTIL_URL = "https://raw.githubusercontent.com/"..USERNAME.."/"..REPO.."/main/modules/utilities.lua" .. cb
 local SERVE_URL = "https://raw.githubusercontent.com/"..USERNAME.."/"..REPO.."/main/modules/autoServe.lua" .. cb
+local ANTIAFK_URL = "https://raw.githubusercontent.com/"..USERNAME.."/"..REPO.."/main/modules/antiAfk.lua" .. cb
 
 local function fetch(url)
     local success, result = pcall(function() return game:HttpGet(url) end)
@@ -23,8 +24,9 @@ local Fish_Module     = fetch(FISH_URL)
 local Sell_Module     = fetch(SELL_URL)
 local Util_Module     = fetch(UTIL_URL)
 local Serve_Module    = fetch(SERVE_URL)
+local AntiAfk_Module  = fetch(ANTIAFK_URL)
 
-if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Module and Util_Module and Serve_Module then
+if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Module and Util_Module and Serve_Module and AntiAfk_Module then
     -- Run layout environment setup
     local App = UI_Module.Create()
     
@@ -339,6 +341,25 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Modul
         end
     end)
     
+    UI_Module.AddSectionLabel(UtilsPage, "ANTI-AFK")
+    
+    UI_Module.AddNumberInput(
+        UtilsPage,
+        "Action Interval (seconds)",
+        30,   -- default
+        10,   -- minimum 10s
+        300,  -- maximum 5 minutes
+        function(value)
+            AntiAfk_Module.Interval = value
+            print("[AntiAfk]: Interval set to " .. value .. "s")
+        end
+    )
+    
+    UI_Module.AddToggle(UtilsPage, "Enable Anti-AFK", function(state)
+        AntiAfk_Module.Enabled = state
+        if state then AntiAfk_Module.Start() else AntiAfk_Module.Stop() end
+    end)
+    
     -------------------------------------------
     -- TAB 7: Config
     -------------------------------------------
@@ -356,6 +377,7 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Modul
         Fish_Module.Stop()
         Sell_Module.Stop()
         Serve_Module.Stop()
+        AntiAfk_Module.Stop()
         if PortableMenu then PortableMenu.Destroy() end
     end)
     
