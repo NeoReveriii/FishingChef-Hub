@@ -258,15 +258,41 @@ local function Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, ta
     local LocalPlayer = Players.LocalPlayer
     local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
     local backpack = LocalPlayer:WaitForChild("Backpack")
+    local humanoid = character:WaitForChild("Humanoid")
     
     debugLog("Starting smart fulfillment for: " .. targetFoodName .. " (Recipe: " .. targetRecipe .. ", Fish: " .. targetFish .. ")")
+    
+    -- Helper function to equip tool with hotbar management
+    local function safeEquipTool(tool)
+        -- Count equipped tools
+        local equippedCount = 0
+        for _, child in ipairs(character:GetChildren()) do
+            if child:IsA("Tool") then
+                equippedCount = equippedCount + 1
+            end
+        end
+        
+        -- If hotbar is full (typically 6 slots), unequip a non-food tool first
+        if equippedCount >= 6 then
+            debugLog("Hotbar full, unequipping a tool to make room...")
+            for _, child in ipairs(character:GetChildren()) do
+                if child:IsA("Tool") and child.Name ~= targetFoodName then
+                    humanoid:UnequipTools(child)
+                    task.wait(0.1)
+                    break
+                end
+            end
+        end
+        
+        humanoid:EquipTool(tool)
+        task.wait(0.2)
+    end
     
     -- Step 1: Check Hotbar/Backpack for tool
     for _, tool in ipairs(backpack:GetChildren()) do
         if tool.Name == targetFoodName then
             debugLog("Found " .. targetFoodName .. " in hotbar, equipping...")
-            character.Humanoid:EquipTool(tool)
-            task.wait(0.2)
+            safeEquipTool(tool)
             ServeFood(targetNPC.npc, targetFoodName, targetSlot)
             return true
         end
@@ -327,8 +353,7 @@ local function Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, ta
             for _, tool in ipairs(backpack:GetChildren()) do
                 if tool.Name == targetFoodName then
                     debugLog("Found " .. targetFoodName .. " in hotbar after cooking, equipping...")
-                    character.Humanoid:EquipTool(tool)
-                    task.wait(0.2)
+                    safeEquipTool(tool)
                     ServeFood(targetNPC.npc, targetFoodName, targetSlot)
                     return true
                 end
