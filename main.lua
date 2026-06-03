@@ -37,19 +37,19 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Modul
     -------------------------------------------
     -- TAB 1: Auto Cooking
     -------------------------------------------
-    UI_Module.AddDropdown(CookPage, "Target Recipe Cuisine", {"Sashimi", "Nigiri", "Sushi"}, false, function(choice)
+    UI_Module.AddDropdown(CookPage, "Target Recipe", {"Sashimi", "Nigiri", "Sushi"}, false, function(choice)
         Logic_Module.SelectedRecipe = choice
         print("[State]: Set target recipe to -> " .. choice)
     end)
     
-    local dropdownController = UI_Module.AddDropdown(CookPage, "Target Species Selection", {"Loading..."}, true, function(choices)
+    local dropdownController = UI_Module.AddDropdown(CookPage, "Type of Fish", {"Loading..."}, true, function(choices)
         Logic_Module.SelectedFishes = choices
         print("[State]: Set target species to -> " .. table.concat(choices, ", "))
     end)
     
     local RefreshBtn = Instance.new("TextButton", CookPage)
     RefreshBtn.Size = UDim2.new(0.95, 0, 0, 30)
-    RefreshBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+    RefreshBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
     RefreshBtn.Text = "Refresh Inventory"
     RefreshBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     RefreshBtn.Font = Enum.Font.GothamMedium
@@ -72,7 +72,24 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Modul
         dropdownController.Refresh(available)
     end)
     
-    UI_Module.AddToggle(CookPage, "Enable AutoCook Engine Loop", function(state)
+    local ClearBtn = Instance.new("TextButton", CookPage)
+    ClearBtn.Size = UDim2.new(0.95, 0, 0, 30)
+    ClearBtn.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
+    ClearBtn.Text = "Clear Selection"
+    ClearBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ClearBtn.Font = Enum.Font.GothamMedium
+    ClearBtn.TextSize = 13
+    Instance.new("UICorner", ClearBtn).CornerRadius = UDim.new(0, 6)
+    
+    ClearBtn.MouseButton1Click:Connect(function()
+        Logic_Module.SelectedRecipe = "Sashimi"
+        Logic_Module.SelectedFishes = {}
+        dropdownController.Refresh({"Loading..."})
+        Logic_Module.Stop()
+        print("[State]: Selection cleared")
+    end)
+    
+    UI_Module.AddToggle(CookPage, "Enable AutoCook", function(state)
         Logic_Module.Enabled = state
         if state then Logic_Module.Start() else Logic_Module.Stop() end
     end)
@@ -112,7 +129,7 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Modul
     -- Refresh button (same style as Chef Automation tab)
     local SellRefreshBtn = Instance.new("TextButton", SellPage)
     SellRefreshBtn.Size = UDim2.new(0.95, 0, 0, 30)
-    SellRefreshBtn.BackgroundColor3 = Color3.fromRGB(52, 152, 219)
+    SellRefreshBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
     SellRefreshBtn.Text = "Refresh Fish List"
     SellRefreshBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     SellRefreshBtn.Font = Enum.Font.GothamMedium
@@ -141,6 +158,22 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Modul
     UI_Module.AddToggle(SellPage, "Auto Sell", function(state)
         Sell_Module.Enabled = state
         if state then Sell_Module.Start() else Sell_Module.Stop() end
+    end)
+    
+    local SellClearBtn = Instance.new("TextButton", SellPage)
+    SellClearBtn.Size = UDim2.new(0.95, 0, 0, 30)
+    SellClearBtn.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
+    SellClearBtn.Text = "Clear Selection"
+    SellClearBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    SellClearBtn.Font = Enum.Font.GothamMedium
+    SellClearBtn.TextSize = 13
+    Instance.new("UICorner", SellClearBtn).CornerRadius = UDim.new(0, 6)
+    
+    SellClearBtn.MouseButton1Click:Connect(function()
+        Sell_Module.SelectedFish = {}
+        sellDropdown.Refresh({"Loading..."})
+        Sell_Module.Stop()
+        print("[AutoSell]: Selection cleared")
     end)
 
     -------------------------------------------
@@ -180,156 +213,28 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Modul
         Fish_Module.Enabled = state
         if state then Fish_Module.Start() else Fish_Module.Stop() end
     end)
-
-    UI_Module.AddSectionLabel(SettingsPage, "Admin Probe")
-
-    -- Step 1: Enumerate everything DefaultAdmin service exposes
-    local ScanAdminBtn = Instance.new("TextButton", SettingsPage)
-    ScanAdminBtn.Size = UDim2.new(0.95, 0, 0, 30)
-    ScanAdminBtn.BackgroundColor3 = Color3.fromRGB(155, 89, 182)
-    ScanAdminBtn.Text = "🔍 Scan DefaultAdmin Remotes"
-    ScanAdminBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    ScanAdminBtn.Font = Enum.Font.GothamMedium
-    ScanAdminBtn.TextSize = 13
-    Instance.new("UICorner", ScanAdminBtn).CornerRadius = UDim.new(0, 6)
-
-    ScanAdminBtn.MouseButton1Click:Connect(function()
-        ScanAdminBtn.Text = "Scanning..."
-        task.spawn(function()
-            local RS = game:GetService("ReplicatedStorage")
-
-            local ok, Services = pcall(function()
-                return RS:WaitForChild("Packages",5)
-                         :WaitForChild("Knit",5)
-                         :WaitForChild("Services",5)
-            end)
-            if not ok then
-                print("[AdminProbe]: Could not reach Knit Services")
-                ScanAdminBtn.Text = "🔍 Scan DefaultAdmin Remotes"
-                return
-            end
-
-            -- Find ANY admin-sounding service
-            local adminServices = {}
-            for _, svc in ipairs(Services:GetChildren()) do
-                local lower = string.lower(svc.Name)
-                if string.find(lower, "admin") or string.find(lower, "command") or string.find(lower, "default") then
-                    table.insert(adminServices, svc)
-                end
-            end
-
-            if #adminServices == 0 then
-                print("[AdminProbe]: No admin-like services found under Knit Services.")
-                ScanAdminBtn.Text = "🔍 Scan DefaultAdmin Remotes"
-                return
-            end
-
-            for _, svc in ipairs(adminServices) do
-                print("[AdminProbe]: ── Service: " .. svc:GetFullName())
-
-                -- Enumerate every child recursively (RE, RF, ModuleScripts, etc.)
-                local function enumerate(obj, depth)
-                    local indent = string.rep("  ", depth)
-                    for _, child in ipairs(obj:GetChildren()) do
-                        print("[AdminProbe]: " .. indent .. child.ClassName .. " | " .. child.Name)
-                        enumerate(child, depth + 1)
-                    end
-                end
-                enumerate(svc, 1)
-            end
-
-            ScanAdminBtn.Text = "🔍 Scan DefaultAdmin Remotes"
-        end)
-    end)
-
-    -- Step 2: Try common RunCommand-style remotes with giveFish
-    local RunCmdBtn = Instance.new("TextButton", SettingsPage)
-    RunCmdBtn.Size = UDim2.new(0.95, 0, 0, 30)
-    RunCmdBtn.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
-    RunCmdBtn.Text = "⚡ Try RunCommand giveFish"
-    RunCmdBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    RunCmdBtn.Font = Enum.Font.GothamMedium
-    RunCmdBtn.TextSize = 13
-    Instance.new("UICorner", RunCmdBtn).CornerRadius = UDim.new(0, 6)
-
-    RunCmdBtn.MouseButton1Click:Connect(function()
-        RunCmdBtn.Text = "Trying..."
-        task.spawn(function()
-            local RS = game:GetService("ReplicatedStorage")
-            local LocalPlayer = game:GetService("Players").LocalPlayer
-
-            local ok, Services = pcall(function()
-                return RS:WaitForChild("Packages",5)
-                         :WaitForChild("Knit",5)
-                         :WaitForChild("Services",5)
-            end)
-            if not ok then
-                print("[AdminProbe]: Could not reach Knit Services")
-                RunCmdBtn.Text = "⚡ Try RunCommand giveFish"
-                return
-            end
-
-            -- Names that admin systems typically use for their executor remote
-            local runRemoteNames = {
-                "RunCommand", "ExecuteCommand", "RunCmd", "Execute",
-                "Command", "AdminCommand", "HandleCommand", "ProcessCommand",
-                "Run", "Invoke", "CallCommand",
-            }
-
-            -- Args shapes to try for each remote
-            local argShapes = {
-                function(r) r:FireServer("giveFish") end,
-                function(r) r:FireServer("giveFish", {}) end,
-                function(r) r:FireServer("giveFish", LocalPlayer) end,
-                function(r) r:FireServer({cmd = "giveFish"}) end,
-                function(r) r:FireServer({command = "giveFish", args = {}}) end,
-                function(r) r:InvokeServer("giveFish") end,
-                function(r) r:InvokeServer("giveFish", LocalPlayer) end,
-            }
-
-            local found = 0
-            for _, svc in ipairs(Services:GetChildren()) do
-                local lower = string.lower(svc.Name)
-                if not (string.find(lower, "admin") or string.find(lower, "command") or string.find(lower, "default")) then
-                    continue
-                end
-
-                for _, container in ipairs(svc:GetChildren()) do
-                    for _, name in ipairs(runRemoteNames) do
-                        local remote = container:FindFirstChild(name)
-                        if not remote then
-                            remote = svc:FindFirstChild(name)
-                        end
-                        if remote and (remote:IsA("RemoteEvent") or remote:IsA("RemoteFunction")) then
-                            found = found + 1
-                            print("[AdminProbe]: Trying '" .. name .. "' in " .. remote:GetFullName())
-                            for i, fn in ipairs(argShapes) do
-                                local attemptOk, err = pcall(fn, remote)
-                                print("[AdminProbe]:   Shape " .. i .. " -> ok=" .. tostring(attemptOk) .. (not attemptOk and (" | " .. tostring(err)) or ""))
-                            end
-                        end
-                    end
-                end
-            end
-
-            if found == 0 then
-                print("[AdminProbe]: No RunCommand-style remote found. The admin system likely only listens to player chat — not exploitable via remote.")
-            end
-
-            RunCmdBtn.Text = "⚡ Try RunCommand giveFish"
-        end)
-    end)
     
     -------------------------------------------
     -- TAB 5: Utilities
     -------------------------------------------
     UI_Module.AddSectionLabel(UtilsPage, "PERFORMANCE")
     
-    UI_Module.AddToggle(UtilsPage, "FPS Boost", function(state)
-        if state then
+    local FPSBoostBtn = Instance.new("TextButton", UtilsPage)
+    FPSBoostBtn.Size = UDim2.new(0.95, 0, 0, 30)
+    FPSBoostBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+    FPSBoostBtn.Text = "Enable FPS Boost"
+    FPSBoostBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    FPSBoostBtn.Font = Enum.Font.GothamMedium
+    FPSBoostBtn.TextSize = 13
+    Instance.new("UICorner", FPSBoostBtn).CornerRadius = UDim.new(0, 6)
+    
+    FPSBoostBtn.MouseButton1Click:Connect(function()
+        if not Util_Module.IsFPSBoostEnabled() then
             Util_Module.EnableFPSBoost()
+            FPSBoostBtn.Text = "FPS Boost Enabled"
+            FPSBoostBtn.BackgroundColor3 = Color3.fromRGB(39, 174, 96)
         else
-            Util_Module.DisableFPSBoost()
+            print("[Utilities]: FPS Boost already enabled (requires game restart to disable)")
         end
     end)
     

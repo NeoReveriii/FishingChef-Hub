@@ -232,6 +232,9 @@ function GUI.Create()
         MainBtn.TextXAlignment = Enum.TextXAlignment.Left
         Instance.new("UICorner", MainBtn).CornerRadius = UDim.new(0, 5)
         
+        -- Add padding using spaces instead of TextPadding (TextPadding causes tab visibility issues)
+        MainBtn.Text = "   --   ▼"
+        
         local FloatingList = Instance.new("Frame")
         FloatingList.Name = "FloatingDropdown"
         FloatingList.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
@@ -268,9 +271,9 @@ function GUI.Create()
                 if v then table.insert(keys, k) end 
             end
             if #keys > 0 then
-                MainBtn.Text = table.concat(keys, ", ") .. "  ▼"
+                MainBtn.Text = "   " .. table.concat(keys, ", ") .. "   ▼"
             else
-                MainBtn.Text = "--  ▼"
+                MainBtn.Text = "   --   ▼"
             end
         end
         
@@ -319,7 +322,7 @@ function GUI.Create()
                         for k, v in pairs(selectedItems) do if v then table.insert(activeKeys, k) end end
                         if callback then callback(activeKeys) end
                     else
-                        MainBtn.Text = tostring(option) .. "  ▼"
+                        MainBtn.Text = "   " .. tostring(option) .. "   ▼"
                         FloatingList.Visible = false
                         if callback then callback(option) end
                     end
