@@ -5,6 +5,9 @@ local loopThread = nil
 AutoServe.Enabled = false
 AutoServe.AutoCookModule = nil -- Reference to AutoCook module for cooking
 
+-- Memory Cache to prevent double-serving stuck VIPs without a timer
+local servedNPCsMemory = {}
+
 -- UI Configuration
 AutoServe.Config = {
     ServeNormalNPCs = true,
@@ -128,6 +131,96 @@ local function ServeFood(npcInstance, foodName, targetSeatSlot)
     end)
 end
 
+-- Check if player is at restaurant plot
+local function IsPlayerAtRestaurant()
+    local Players = game:GetService("Players")
+    local LocalPlayer = Players.LocalPlayer
+    local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    
+    if not humanoidRootPart then return false end
+    
+    -- Check if player is near their restaurant plot
+    local plotPosition = nil
+    pcall(function()
+        plotPosition = workspace:WaitForChild("Code", 2):WaitForChild("Plots", 2):WaitForChild(LocalPlayer.Name, 2):WaitForChild("STALL", 2):WaitForChild("Baseplate", 2).Position
+    end)
+    
+    if not plotPosition then return false end
+    
+    local playerPosition = humanoidRootPart.Position
+    local distance = (playerPosition - plotPosition).Magnitude
+    
+    -- If within 50 units of restaurant, consider as being at restaurant
+    return distance < 50
+end
+
+-- Save current player position
+local savedPosition = nil
+local function SavePlayerPosition()
+    local Players = game:GetService("Players")
+    local LocalPlayer = Players.LocalPlayer
+    local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    
+    if humanoidRootPart then
+        savedPosition = {
+            position = humanoidRootPart.Position,
+            CFrame = humanoidRootPart.CFrame
+        }
+        debugLog("Saved player position")
+    end
+end
+
+-- Restore player position
+local function RestorePlayerPosition()
+    if not savedPosition then
+        debugLog("No saved position to restore")
+        return false
+    end
+    
+    local Players = game:GetService("Players")
+    local LocalPlayer = Players.LocalPlayer
+    local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    
+    if humanoidRootPart then
+        pcall(function()
+            humanoidRootPart.CFrame = savedPosition.CFrame
+            debugLog("Restored player position")
+        end)
+        savedPosition = nil
+        return true
+    end
+    
+    return false
+end
+
+-- Teleport player to restaurant
+local function TeleportToRestaurant()
+    local Players = game:GetService("Players")
+    local LocalPlayer = Players.LocalPlayer
+    local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    
+    if not humanoidRootPart then return false end
+    
+    local plotPosition = nil
+    pcall(function()
+        plotPosition = workspace:WaitForChild("Code", 2):WaitForChild("Plots", 2):WaitForChild(LocalPlayer.Name, 2):WaitForChild("STALL", 2):WaitForChild("Baseplate", 2).Position
+    end)
+    
+    if not plotPosition then return false end
+    
+    pcall(function()
+        humanoidRootPart.CFrame = CFrame.new(plotPosition + Vector3.new(0, 5, 0))
+        debugLog("Teleported to restaurant")
+    end)
+    
+    task.wait(0.5)
+    return true
+end
+
 -- Get NPC Position Safely
 local function GetNPCPosition(npc)
     local location = npc:FindFirstChild("Location")
@@ -193,6 +286,57 @@ local function IsValidNPC(npc)
     return success and value ~= nil
 end
 
+-- CRITICAL FIX: Only considers an NPC valid if the game has assigned it a real 'CHAR' model
+local function IsRealCustomer(npc)
+    local charVal = npc:FindFirstChild("CHAR")
+    return charVal ~= nil and charVal.Value ~= nil
+end
+
+-- Get lantern anchor for accurate left/right detection
+local function GetLanternAnchor()
+    local Players = game:GetService("Players")
+    local LocalPlayer = Players.LocalPlayer
+    local plot = workspace:FindFirstChild("Code") 
+        and workspace.Code:FindFirstChild("Plots") 
+        and workspace.Code.Plots:FindFirstChild(LocalPlayer.Name)
+    
+    local stall = plot and plot:FindFirstChild("STALL")
+    if not stall then return nil end
+
+    local hangingLantern = stall:FindFirstChild("HangingLantern")
+    if hangingLantern then
+        local basePart = hangingLantern:FindFirstChild("Base")
+        if basePart and basePart:IsA("BasePart") then
+            return basePart
+        end
+    end
+    return nil
+end
+
+-- Check if NPC is seated
+local function IsNPCSeated(npc)
+    local animsFolder = npc:FindFirstChild("Anims")
+    if animsFolder and animsFolder:FindFirstChild("Sit") then
+        debugLog("NPC seated (Anims folder check)")
+        return true
+    end
+
+    local charVal = npc:FindFirstChild("CHAR")
+    if charVal and charVal.Value then
+        local npcModel = charVal.Value
+        if npcModel and npcModel:IsA("Instance") then
+            local humanoid = npcModel:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                if humanoid.Sit or humanoid.FloorMaterial == Enum.Material.Air then
+                    debugLog("NPC seated (Humanoid check)")
+                    return true
+                end
+            end
+        end
+    end
+    return false
+end
+
 -- Phase 1: Radar, Position Detection & Recycling
 local function Phase1_RadarDetection(OpenPlot, RequestRestaurauntData)
     local Workspace = game:GetService("Workspace")
@@ -219,27 +363,39 @@ local function Phase1_RadarDetection(OpenPlot, RequestRestaurauntData)
     end
     
     -- Collect valid NPCs
+    local lanternBase = GetLanternAnchor()
     local validNPCs = {}
     for _, npc in ipairs(activeNPCs:GetChildren()) do
-        if IsValidNPC(npc) then
+        -- CRITICAL FIX: Only consider NPCs with real CHAR model (filter ghost slots)
+        if IsRealCustomer(npc) then
             local position = GetNPCPosition(npc)
             local identity = GetNPCIdentity(npc)
             
             if position then
+                local horizontalOffset = 0
+                if lanternBase then
+                    -- Use lantern anchor for accurate left/right detection
+                    local objectVector = position - lanternBase.Position
+                    horizontalOffset = objectVector:Dot(lanternBase.CFrame.RightVector)
+                else
+                    -- Fallback to X-coordinate if lantern not found
+                    horizontalOffset = position.X
+                end
+                
                 table.insert(validNPCs, {
-                    npc = npc,
+                    npc = npc, -- Keeps tracking memory tied directly to this Roblox Instance reference
                     position = position,
                     identity = identity,
-                    xCoord = position.X
+                    horizontalOffset = horizontalOffset
                 })
                 debugLog("Found valid NPC: " .. tostring(identity) .. " at X: " .. tostring(position.X))
             end
         end
     end
     
-    -- Sort by X-coordinate (lowest to highest)
+    -- Sort left-to-right relative to lantern anchor
     table.sort(validNPCs, function(a, b)
-        return a.xCoord < b.xCoord
+        return a.horizontalOffset < b.horizontalOffset
     end)
     
     -- Assign slot positions
@@ -383,8 +539,9 @@ end
 -- Main Start Function
 function AutoServe.Start()
     if loopThread then task.cancel(loopThread) end
+    AutoServe.Enabled = true -- Fixes state check immediately
     
-    print("[AutoServe]: Thread initialized.")
+    print("[AutoServe]: Thread initialized with Loop-Fix Memory.")
     debugLog("Starting AutoServe with configuration:")
     debugLog("  Serve Normal NPCs: " .. tostring(AutoServe.Config.ServeNormalNPCs))
     debugLog("  Serve Special Guests: " .. tostring(AutoServe.Config.ServeSpecialGuests))
@@ -419,6 +576,15 @@ function AutoServe.Start()
         
         while AutoServe.Enabled do
             pcall(function()
+                local currentTime = os.time()
+                
+                -- Clean up memory cache (items older than 75 seconds get released)
+                for targetInstance, timestamp in pairs(servedNPCsMemory) do
+                    if currentTime - timestamp > 75 then
+                        servedNPCsMemory[targetInstance] = nil
+                    end
+                end
+                
                 -- Phase 1: Radar Detection
                 local slot1, slot2 = Phase1_RadarDetection(OpenPlot, RequestRestaurauntData)
                 
@@ -444,13 +610,14 @@ function AutoServe.Start()
                 -- Scenario A: Normal Mode Only
                 if AutoServe.Config.ServeNormalNPCs and not AutoServe.Config.ServeSpecialGuests then
                     debugLog("Scenario A: Normal Mode - serving any customer")
-                    if slot1 then
+                    if slot1 and not servedNPCsMemory[slot1.npc] then
                         targetNPC = slot1
                         targetSlot = 1
                         targetFoodName = "Sashimi" -- Default for normal NPCs
                         targetRecipe = "Sashimi"
                         targetFish = nil -- Any fish for normal NPCs
-                    elseif slot2 then
+                    end
+                    if not targetNPC and slot2 and not servedNPCsMemory[slot2.npc] then
                         targetNPC = slot2
                         targetSlot = 2
                         targetFoodName = "Sashimi"
@@ -464,7 +631,7 @@ function AutoServe.Start()
                     debugLog("Scenario B: VIP Target Mode - checking for selected VIPs")
                     
                     -- Check Slot 1
-                    if slot1 and slot1.identity then
+                    if slot1 and slot1.identity and not servedNPCsMemory[slot1.npc] then
                         for _, vipName in ipairs(AutoServe.Config.SelectedVIPs) do
                             if slot1.identity:find(vipName) then
                                 targetNPC = slot1
@@ -479,8 +646,8 @@ function AutoServe.Start()
                         end
                     end
                     
-                    -- Check Slot 2 if not found in Slot 1
-                    if not targetNPC and slot2 and slot2.identity then
+                    -- Check Slot 2
+                    if not targetNPC and slot2 and slot2.identity and not servedNPCsMemory[slot2.npc] then
                         for _, vipName in ipairs(AutoServe.Config.SelectedVIPs) do
                             if slot2.identity:find(vipName) then
                                 targetNPC = slot2
@@ -496,23 +663,34 @@ function AutoServe.Start()
                     end
                 end
                 
-                -- Scenario C: No Target Found
+                -- Scenario C: No Target Found (or target already has been served)
                 if not targetNPC then
-                    debugLog("Scenario C: No target found, recycling...")
+                    debugLog("No unserved targets found in slots. Cycling plot alternative...")
                     pcall(function()
                         OpenPlot:FireServer(false)
                         task.wait(0.5)
                         OpenPlot:FireServer(true)
                     end)
-                    task.wait(10)
+                    task.wait(5)
                     return
                 end
                 
                 -- Phase 2: Smart Fulfillment
                 if targetNPC and targetFoodName then
+                    -- Wait for NPC to be seated before serving
+                    local seatTimeout = 0
+                    while not IsNPCSeated(targetNPC.npc) and seatTimeout < 8 do
+                        task.wait(0.5)
+                        seatTimeout = seatTimeout + 0.5
+                    end
+                    
                     local success = Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, targetRecipe, targetFish, EquipPlate, RequestRestaurauntData, Cook, AutoServe.AutoCookModule)
                     if success then
-                        debugLog("Successfully served customer")
+                        debugLog("Successfully served customer! Blacklisting unique NPC object reference.")
+                        
+                        -- Save the unique Folder instance to memory cache
+                        servedNPCsMemory[targetNPC.npc] = os.time()
+                        
                         task.wait(2)
                     else
                         debugLog("Failed to serve customer, recycling...")
