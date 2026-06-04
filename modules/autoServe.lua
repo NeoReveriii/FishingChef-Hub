@@ -8,10 +8,6 @@ AutoServe.AutoCookModule = nil -- Reference to AutoCook module for cooking
 -- Memory Cache to prevent double-serving stuck VIPs without a timer
 local servedNPCsMemory = {}
 
--- NPC Status Tracking for Scanner (only tracks non-filtered NPCs)
-local npcStatusCache = {} -- Maps NPC instance to last known status
-local lastReopenTime = 0 -- Track last plot reopen time for cooldown
-
 -- UI Configuration
 AutoServe.Config = {
     ServeNormalNPCs = true,
@@ -38,30 +34,6 @@ local AVAILABLE_VIPS = {
 -- Debug function
 local function debugLog(message)
     print("[AutoServe]: " .. message)
-end
-
--- Scanner Status Update - Only logs when status changes
-local function UpdateNPCStatus(npc, slot, status)
-    local lastStatus = npcStatusCache[npc]
-    if lastStatus ~= status then
-        local identity = GetNPCIdentity(npc) or "Unknown"
-        debugLog("[Scanner] Slot " .. slot .. " - " .. identity .. ": " .. status)
-        npcStatusCache[npc] = status
-    end
-end
-
--- Clean up status cache for NPCs that are gone
-local function CleanupStatusCache(validNPCs)
-    local validInstances = {}
-    for _, npcData in ipairs(validNPCs) do
-        validInstances[npcData.npc] = true
-    end
-    
-    for npc, _ in pairs(npcStatusCache) do
-        if not validInstances[npc] then
-            npcStatusCache[npc] = nil
-        end
-    end
 end
 
 -- Fish Scanner - Fetches all available fish from inventory (similar to autoSell/autoCook)
@@ -372,10 +344,10 @@ local function Phase1_RadarDetection(OpenPlot, RequestRestaurauntData)
     -- Open plot and wait for customers
     pcall(function()
         OpenPlot:FireServer(true)
-        debugLog("Plot opened, waiting 8 seconds for customers...")
+        debugLog("Plot opened, waiting 10 seconds for customers...")
     end)
     
-    task.wait(8)
+    task.wait(10)
     
     -- Get customer folder
     local codeFolder = Workspace:FindFirstChild("Code")
@@ -416,8 +388,7 @@ local function Phase1_RadarDetection(OpenPlot, RequestRestaurauntData)
                     identity = identity,
                     horizontalOffset = horizontalOffset
                 })
-                -- Initial status update for new NPCs
-                UpdateNPCStatus(npc, #validNPCs, "Standing")
+                debugLog("Found valid NPC: " .. tostring(identity) .. " at X: " .. tostring(position.X))
             end
         end
     end
@@ -427,22 +398,12 @@ local function Phase1_RadarDetection(OpenPlot, RequestRestaurauntData)
         return a.horizontalOffset < b.horizontalOffset
     end)
     
-    -- Clean up status cache for NPCs that left
-    CleanupStatusCache(validNPCs)
-    
     -- Assign slot positions
     local slot1 = validNPCs[1] or nil
     local slot2 = validNPCs[2] or nil
     
-    -- Update scanner display with current status
-    if slot1 then
-        local status = IsNPCSeated(slot1.npc) and "Seated" or "Standing"
-        UpdateNPCStatus(slot1.npc, 1, status)
-    end
-    if slot2 then
-        local status = IsNPCSeated(slot2.npc) and "Seated" or "Standing"
-        UpdateNPCStatus(slot2.npc, 2, status)
-    end
+    debugLog("Slot 1 (Left): " .. tostring(slot1 and slot1.identity or "Empty"))
+    debugLog("Slot 2 (Right): " .. tostring(slot2 and slot2.identity or "Empty"))
     
     return slot1, slot2
 end
@@ -628,22 +589,16 @@ function AutoServe.Start()
                 local slot1, slot2 = Phase1_RadarDetection(OpenPlot, RequestRestaurauntData)
                 
                 if not slot1 and not slot2 then
-                    -- No customers found, recycle with cooldown
+                    -- No customers found, recycle
                     debugLog("No customers found, recycling...")
-                    local currentTime = os.time()
-                    if currentTime - lastReopenTime >= 5 then
-                        pcall(function()
-                            OpenPlot:FireServer(false)
-                            task.wait(0.5)
-                            OpenPlot:FireServer(true)
-                        end)
-                        lastReopenTime = currentTime
-                        task.wait(5) -- Cooldown after reopen
-                    else
-                        task.wait(3) -- Shorter wait if recently reopened
-                    end
-                    -- Continue to next iteration instead of returning
-                else
+                    pcall(function()
+                        OpenPlot:FireServer(false)
+                        task.wait(0.5)
+                        OpenPlot:FireServer(true)
+                    end)
+                    task.wait(10)
+                    return
+                end
                 
                 -- Decision Branching
                 local targetNPC = nil
@@ -710,35 +665,23 @@ function AutoServe.Start()
                 
                 -- Scenario C: No Target Found (or target already has been served)
                 if not targetNPC then
-                    debugLog("No unserved targets found in slots. Cycling plot...")
-                    local currentTime = os.time()
-                    if currentTime - lastReopenTime >= 5 then
-                        pcall(function()
-                            OpenPlot:FireServer(false)
-                            task.wait(0.5)
-                            OpenPlot:FireServer(true)
-                        end)
-                        lastReopenTime = currentTime
-                        task.wait(5) -- Cooldown after reopen
-                    else
-                        task.wait(3) -- Shorter wait if recently reopened
-                    end
-                    -- Continue to next iteration instead of returning
-                else
+                    debugLog("No unserved targets found in slots. Cycling plot alternative...")
+                    pcall(function()
+                        OpenPlot:FireServer(false)
+                        task.wait(0.5)
+                        OpenPlot:FireServer(true)
+                    end)
+                    task.wait(5)
+                    return
+                end
                 
                 -- Phase 2: Smart Fulfillment
                 if targetNPC and targetFoodName then
                     -- Wait for NPC to be seated before serving
                     local seatTimeout = 0
-                    local wasStanding = not IsNPCSeated(targetNPC.npc)
                     while not IsNPCSeated(targetNPC.npc) and seatTimeout < 8 do
                         task.wait(0.5)
                         seatTimeout = seatTimeout + 0.5
-                        -- Update status if NPC sits during wait
-                        if wasStanding and IsNPCSeated(targetNPC.npc) then
-                            UpdateNPCStatus(targetNPC.npc, targetSlot, "Seated")
-                            wasStanding = false
-                        end
                     end
                     
                     local success = Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, targetRecipe, targetFish, EquipPlate, RequestRestaurauntData, Cook, AutoServe.AutoCookModule)
@@ -748,24 +691,15 @@ function AutoServe.Start()
                         -- Save the unique Folder instance to memory cache
                         servedNPCsMemory[targetNPC.npc] = os.time()
                         
-                        -- NPC will leave after being served, update status
-                        UpdateNPCStatus(targetNPC.npc, targetSlot, "Leaving")
-                        
                         task.wait(2)
                     else
                         debugLog("Failed to serve customer, recycling...")
-                        local currentTime = os.time()
-                        if currentTime - lastReopenTime >= 5 then
-                            pcall(function()
-                                OpenPlot:FireServer(false)
-                                task.wait(0.5)
-                                OpenPlot:FireServer(true)
-                            end)
-                            lastReopenTime = currentTime
-                            task.wait(5) -- Cooldown after reopen
-                        else
-                            task.wait(3) -- Shorter wait if recently reopened
-                        end
+                        pcall(function()
+                            OpenPlot:FireServer(false)
+                            task.wait(0.5)
+                            OpenPlot:FireServer(true)
+                        end)
+                        task.wait(10)
                     end
                 end
             end)
@@ -781,10 +715,6 @@ function AutoServe.Stop()
         task.cancel(loopThread)
         loopThread = nil
     end
-    
-    -- Clear status cache
-    npcStatusCache = {}
-    lastReopenTime = 0
     
     -- Close plot
     pcall(function()
