@@ -40,9 +40,7 @@ function Utilities.EnableFPSBoost()
             v.Transparency = 1
             v.Texture = ""
         elseif v:IsA("ParticleEmitter") or v:IsA("Trail") then
-            pcall(function()
-                v.Lifetime = NumberRange.new(0)
-            end)
+            v.Enabled = false
         end
     end
     
