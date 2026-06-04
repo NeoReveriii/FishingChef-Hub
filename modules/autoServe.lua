@@ -363,10 +363,10 @@ local function Phase1_RadarDetection(OpenPlot)
     for _, npc in ipairs(activeNPCs:GetChildren()) do
         -- GHOST FILTER: Only look at folders that have a physical character
         if IsRealCustomer(npc) then
+            local identity = GetNPCIdentity(npc)
             -- SEATING CHECK: Only add if NPC is actually seated (Humanoid.Sit or floating)
             if IsNPCSeated(npc) then
                 local position = GetNPCPosition(npc)
-                local identity = GetNPCIdentity(npc)
                 
                 if position then
                     local horizontalOffset = 0
@@ -383,7 +383,10 @@ local function Phase1_RadarDetection(OpenPlot)
                         identity = identity,
                         horizontalOffset = horizontalOffset
                     })
+                    debugLog("[✔ SEATED] " .. identity)
                 end
+            else
+                debugLog("[❌ STANDING] " .. identity .. " (Waiting for seat...)")
             end
         end
     end
