@@ -349,6 +349,25 @@ local function IsNPCSeated(npc)
     return false
 end
 
+-- Check if NPC is close enough to counter baseplate to overrule sitting requirements
+local function IsAtCounter(npc)
+    local pos = GetNPCPosition(npc)
+    if not pos then return false end
+    
+    local Players = game:GetService("Players")
+    local LocalPlayer = Players.LocalPlayer
+    local plotBase = nil
+    pcall(function()
+        plotBase = workspace.Code.Plots[LocalPlayer.Name].STALL.Baseplate.Position
+    end)
+    
+    if plotBase then
+        -- If customer is physically within serving range of the counter, count them as ready
+        return (pos - plotBase).Magnitude < 25
+    end
+    return false
+end
+
 -- Get lantern anchor for accurate left/right detection
 local function GetLanternAnchor()
     local Players = game:GetService("Players")
@@ -412,8 +431,10 @@ local function Phase1_RadarDetection(OpenPlot)
                 
                 if IsNPCSeated(npc) then
                     debugLog("[✔ SEATED] " .. identity)
+                elseif IsAtCounter(npc) then
+                    debugLog("[📍 STANDING AT COUNTER] " .. identity)
                 else
-                    debugLog("[⏳ WALKING] " .. identity .. " (Waiting to sit...)")
+                    debugLog("[⏳ WALKING] " .. identity .. " (Approaching...)")
                 end
             end
         end
@@ -714,96 +735,42 @@ function AutoServe.Start()
                 
                 -- Execute Serving Process
                 if targetNPC and targetFoodName then
-                    -- Log targeting info
-                    if not IsNPCSeated(targetNPC.npc) then
-                        debugLog("[TARGET] " .. targetNPC.identity .. " at Slot " .. targetSlot .. " (Walking - waiting for seat...)")
-                    else
-                        debugLog("[TARGET] " .. targetNPC.identity .. " at Slot " .. targetSlot .. " (Seated - serving " .. targetFoodName .. ")")
-                    end
+                    debugLog("[TARGETING] Processing " .. targetNPC.identity .. " at Slot " .. targetSlot)
                     
                     local seatTimeout = 0
-                    while not IsNPCSeated(targetNPC.npc) and seatTimeout < 20 do
+                    -- CRITICAL CRITERIA UPDATE: Loop holds while unseated, BUT releases immediately if customer arrives at the counter!
+                    while not IsNPCSeated(targetNPC.npc) and not IsAtCounter(targetNPC.npc) and seatTimeout < 15 do
                         task.wait(1)
                         seatTimeout = seatTimeout + 1
+                    end
+                    
+                    -- Overrule check: If they are right at the counter, bypass sitting locks completely!
+                    if IsNPCSeated(targetNPC.npc) or IsAtCounter(targetNPC.npc) then
+                        local served = Phase2_SmartFulfillment(
+                            targetNPC, targetFoodName, targetSlot, targetRecipe, targetFish, 
+                            EquipPlate, RequestRestaurauntData, AutoServe.AutoCookModule
+                        )
                         
-                        -- Check if other slot became seated while waiting
-                        local otherSlot = (targetSlot == 1 and slot2) or slot1
-                        if otherSlot and IsNPCSeated(otherSlot.npc) and not servedNPCsMemory[otherSlot.npc] then
-                            local requestedRecipe = GetNPCRequestedRecipe(otherSlot.npc)
-                            if requestedRecipe and AutoServe.Config.NormalOrder[requestedRecipe] then
-                                debugLog("[SWITCH] Other NPC seated while waiting: " .. otherSlot.identity .. " at Slot " .. (targetSlot == 1 and 2 or 1))
-                                targetNPC = otherSlot
-                                targetSlot = (targetSlot == 1 and 2) or 1
-                                targetRecipe = requestedRecipe
-                                targetFish = AutoServe.Config.NormalOrder[requestedRecipe].Fish
-                                targetFoodName = AutoServe.Config.NormalOrder[requestedRecipe].DisplayName
-                                debugLog("[TARGET] Switched to " .. targetNPC.identity .. " at Slot " .. targetSlot .. " (Seated - serving " .. targetFoodName .. ")")
-                                break
-                            else
-                                debugLog("[SWITCH] Other NPC seated but could not read order: " .. otherSlot.identity)
-                            end
+                        if served then
+                            servedNPCsMemory[targetNPC.npc] = os.time()
+                            task.wait(2.5)
+                        else
+                            pcall(function()
+                                OpenPlot:FireServer(false)
+                                task.wait(5)
+                                OpenPlot:FireServer(true)
+                            end)
+                            task.wait(8)
                         end
-                    end
-                    
-                    if not IsNPCSeated(targetNPC.npc) then
-                        debugLog("[HUMAN COMPLIANCE] NPC didn't sit in time. Giving extra grace period...")
-                        task.wait(4)
-                        if not IsNPCSeated(targetNPC.npc) then
-                            debugLog("[TIMEOUT] Customer failed to seat within 24s. Checking other slot...")
-                            -- Try to serve the other NPC if it's seated
-                            local otherSlot = (targetSlot == 1 and slot2) or slot1
-                            if otherSlot and IsNPCSeated(otherSlot.npc) and not servedNPCsMemory[otherSlot.npc] then
-                                local requestedRecipe = GetNPCRequestedRecipe(otherSlot.npc)
-                                if requestedRecipe and AutoServe.Config.NormalOrder[requestedRecipe] then
-                                    debugLog("[FALLBACK] Serving other seated NPC: " .. otherSlot.identity)
-                                    targetNPC = otherSlot
-                                    targetSlot = (targetSlot == 1 and 2) or 1
-                                    targetRecipe = requestedRecipe
-                                    targetFish = AutoServe.Config.NormalOrder[requestedRecipe].Fish
-                                    targetFoodName = AutoServe.Config.NormalOrder[requestedRecipe].DisplayName
-                                    debugLog("[TARGET] " .. targetNPC.identity .. " at Slot " .. targetSlot .. " (Seated - serving " .. targetFoodName .. ")")
-                                else
-                                    debugLog("[FALLBACK] Other NPC seated but could not read order: " .. otherSlot.identity)
-                                end
-                            end
-                            
-                            -- If still no valid target, force plot recycle
-                            if not IsNPCSeated(targetNPC.npc) or not targetRecipe then
-                                debugLog("[TIMEOUT] No seated NPCs available or could not read orders. Forcing plot recycle...")
-                                pcall(function()
-                                    OpenPlot:FireServer(false)
-                                    task.wait(6)
-                                    OpenPlot:FireServer(true)
-                                end)
-                                task.wait(10)
-                                return
-                            end
-                        end
-                    end
-                    
-                    -- Run fulfillment chain
-                    local served = Phase2_SmartFulfillment(
-                        targetNPC, 
-                        targetFoodName, 
-                        targetSlot, 
-                        targetRecipe, 
-                        targetFish, 
-                        EquipPlate, 
-                        RequestRestaurauntData, 
-                        AutoServe.AutoCookModule
-                    )
-                    
-                    if served then
-                        servedNPCsMemory[targetNPC.npc] = os.time()
-                        task.wait(3) -- Anti-detection delay following successful action
                     else
-                        debugLog("[ERROR] Failed to serve " .. targetFoodName .. " to Customer (missing ingredients). Recycling plot...")
+                        -- True timeout fallback if they get physically stuck down the street
+                        debugLog("[TIMEOUT] Target completely stuck on pathing network. Recycling plot...")
                         pcall(function()
                             OpenPlot:FireServer(false)
-                            task.wait(6)
+                            task.wait(5)
                             OpenPlot:FireServer(true)
                         end)
-                        task.wait(10)
+                        task.wait(8)
                     end
                 end
             end)
