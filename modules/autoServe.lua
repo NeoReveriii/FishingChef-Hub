@@ -430,13 +430,16 @@ local function Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, ta
     elseif not restaurantData.Dishes then
         debugLog("[INVENTORY] Restaurant data has no Dishes field")
     else
+        debugLog("[STORAGE] Checking storage for: " .. targetFoodName .. " (Recipe: " .. targetRecipe .. ", Fish: " .. tostring(targetFish) .. ")")
+        local dishCount = 0
         for itemID, foodItem in pairs(restaurantData.Dishes) do
             if type(foodItem) == "table" and foodItem.Name then
+                dishCount = dishCount + 1
                 local itemNameLower = string.gsub(string.lower(foodItem.Name), "_", " ")
                 local amountValue = tonumber(foodItem.Amount) or 0
                 
                 if (itemNameLower == lowerFoodName or (itemNameLower:find(lowerRecipe) and itemNameLower:find(lowerFish))) and amountValue > 0 then
-                    debugLog("[STORAGE] Found " .. foodItem.Name .. " inside Cabinet. ID: " .. tostring(itemID))
+                    debugLog("[STORAGE] Found " .. foodItem.Name .. " inside Cabinet. ID: " .. tostring(itemID) .. ", Amount: " .. amountValue)
                     
                     pcall(function()
                         EquipPlate:FireServer({
@@ -454,6 +457,7 @@ local function Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, ta
                 end
             end
         end
+        debugLog("[STORAGE] Checked " .. dishCount .. " dishes in storage, no match found")
     end
     
     -- Auto Cook Execution
@@ -678,19 +682,5 @@ function AutoServe.Stop()
     end
     debugLog("Module loop cleanly halted.")
 end
-
--- ========================================================
--- RUNTIME INITIALIZER FOR EXECUTORS / DIRECT RUNS
--- ========================================================
-task.spawn(function()
-    -- Dynamically capture global/shared background configurations
-    if not AutoServe.AutoCookModule then
-        local mainHubCook = shared.AutoCookModule or _G.AutoCookModule
-        if mainHubCook then
-            AutoServe.AutoCookModule = mainHubCook
-        end
-    end
-    AutoServe.Start()
-end)
 
 return AutoServe
