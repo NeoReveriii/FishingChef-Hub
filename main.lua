@@ -236,6 +236,54 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Modul
         print("[AutoServe]: Serve Normal NPCs -> " .. tostring(state))
     end)
     
+    UI_Module.AddDropdown(ServePage, "Normal NPC Recipe", {"Sashimi", "Sushi", "Nigiri"}, false, function(choice)
+        Serve_Module.Config.NormalOrder.Recipe = choice
+        print("[AutoServe]: Normal Recipe -> " .. choice)
+    end)
+    
+    local fishDropdown = UI_Module.AddDropdown(ServePage, "Normal NPC Fish", {"Loading..."}, false, function(choice)
+        Serve_Module.Config.NormalOrder.Fish = choice
+        -- Update display name based on recipe and fish
+        local displayName = choice .. " " .. Serve_Module.Config.NormalOrder.Recipe
+        Serve_Module.Config.NormalOrder.DisplayName = displayName
+        print("[AutoServe]: Normal Fish -> " .. choice .. " (" .. displayName .. ")")
+    end)
+    
+    -- Refresh fish list button
+    local RefreshFishBtn = Instance.new("TextButton", ServePage)
+    RefreshFishBtn.Size = UDim2.new(0.95, 0, 0, 30)
+    RefreshFishBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    RefreshFishBtn.Text = "Refresh Fish List"
+    RefreshFishBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    RefreshFishBtn.Font = Enum.Font.GothamMedium
+    RefreshFishBtn.TextSize = 13
+    Instance.new("UICorner", RefreshFishBtn).CornerRadius = UDim.new(0, 6)
+    
+    RefreshFishBtn.MouseButton1Click:Connect(function()
+        RefreshFishBtn.Text = "Scanning..."
+        task.spawn(function()
+            local availableFish = {}
+            -- Try to get fish from Logic_Module (AutoCook) which has FetchAvailableFish
+            if Logic_Module and Logic_Module.GetAvailableFish then
+                availableFish = Logic_Module.GetAvailableFish()
+            end
+            if #availableFish == 0 then availableFish = {"No Fish Found"} end
+            fishDropdown.Refresh(availableFish)
+            RefreshFishBtn.Text = "Refresh Fish List"
+            print("[AutoServe]: Fish list updated with " .. #availableFish .. " types.")
+        end)
+    end)
+    
+    -- Auto-populate fish list on load
+    task.spawn(function()
+        local availableFish = {}
+        if Logic_Module and Logic_Module.GetAvailableFish then
+            availableFish = Logic_Module.GetAvailableFish()
+        end
+        if #availableFish == 0 then availableFish = {"No Fish Found"} end
+        fishDropdown.Refresh(availableFish)
+    end)
+    
     UI_Module.AddToggle(ServePage, "Serve Special Guests", function(state)
         Serve_Module.Config.ServeSpecialGuests = state
         print("[AutoServe]: Serve Special Guests -> " .. tostring(state))

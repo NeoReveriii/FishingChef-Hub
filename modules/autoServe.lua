@@ -12,7 +12,14 @@ local servedNPCsMemory = {}
 AutoServe.Config = {
     ServeNormalNPCs = true,
     ServeSpecialGuests = false,
-    SelectedVIPs = {} -- Array of selected VIP names
+    SelectedVIPs = {}, -- Array of selected VIP names
+    
+    -- Normal NPC Order Configuration
+    NormalOrder = {
+        Recipe = "Sashimi",          -- Options: "Sashimi", "Sushi", "Nigiri"
+        Fish = "salmon",             -- Internal fish name string to use
+        DisplayName = "Salmon Sashimi" -- Display name of tool
+    }
 }
 
 -- VIP Hardcoded Menu Dictionary (includes recipe type and specific fish)
@@ -364,29 +371,30 @@ local function Phase1_RadarDetection(OpenPlot)
         -- GHOST FILTER: Only look at folders that have a physical character
         if IsRealCustomer(npc) then
             local identity = GetNPCIdentity(npc)
-            -- SEATING CHECK: Only add if NPC is actually seated (Humanoid.Sit or floating)
-            if IsNPCSeated(npc) then
-                local position = GetNPCPosition(npc)
-                
-                if position then
-                    local horizontalOffset = 0
-                    if lanternBase then
-                        local objectVector = position - lanternBase.Position
-                        horizontalOffset = objectVector:Dot(lanternBase.CFrame.RightVector)
-                    else
-                        horizontalOffset = position.X
-                    end
-                    
-                    table.insert(validNPCs, {
-                        npc = npc, 
-                        position = position,
-                        identity = identity,
-                        horizontalOffset = horizontalOffset
-                    })
-                    debugLog("[✔ SEATED] " .. identity)
+            local position = GetNPCPosition(npc)
+            
+            if position then
+                local horizontalOffset = 0
+                if lanternBase then
+                    local objectVector = position - lanternBase.Position
+                    horizontalOffset = objectVector:Dot(lanternBase.CFrame.RightVector)
+                else
+                    horizontalOffset = position.X
                 end
-            else
-                debugLog("[❌ STANDING] " .. identity .. " (Waiting for seat...)")
+                
+                -- CRITICAL FIX: Track them even if standing so we don't spam close the stall on them!
+                table.insert(validNPCs, {
+                    npc = npc, 
+                    position = position,
+                    identity = identity,
+                    horizontalOffset = horizontalOffset
+                })
+                
+                if IsNPCSeated(npc) then
+                    debugLog("[✔ SEATED] " .. identity)
+                else
+                    debugLog("[⏳ WALKING] " .. identity .. " (Waiting to sit...)")
+                end
             end
         end
     end
@@ -556,16 +564,24 @@ function AutoServe.Start()
                 if not targetNPC and AutoServe.Config.ServeNormalNPCs then
                     if slot1 and not servedNPCsMemory[slot1.npc] then
                         targetNPC = slot1; targetSlot = 1
-                        targetFoodName = "Sashimi"; targetRecipe = "Sashimi"; targetFish = nil
+                        targetFoodName = AutoServe.Config.NormalOrder.DisplayName
+                        targetRecipe = AutoServe.Config.NormalOrder.Recipe
+                        targetFish = AutoServe.Config.NormalOrder.Fish
                     elseif slot2 and not servedNPCsMemory[slot2.npc] then
                         targetNPC = slot2; targetSlot = 2
-                        targetFoodName = "Sashimi"; targetRecipe = "Sashimi"; targetFish = nil
+                        targetFoodName = AutoServe.Config.NormalOrder.DisplayName
+                        targetRecipe = AutoServe.Config.NormalOrder.Recipe
+                        targetFish = AutoServe.Config.NormalOrder.Fish
                     end
                 end
                 
                 -- Scenario C: Cycle Plot (No targets matched or unwanted customers occupying seats)
                 if not targetNPC then
-                    debugLog("No unserved targets matching configuration found. Restalling safely...")
+                    local reason = "No valid targets found"
+                    if slot1 or slot2 then
+                        reason = "All seated customers already served in this cycle"
+                    end
+                    debugLog("[CYCLE] " .. reason .. ". Recycling plot...")
                     pcall(function()
                         OpenPlot:FireServer(false)
                         task.wait(1)
@@ -577,19 +593,38 @@ function AutoServe.Start()
                 
                 -- Execute Serving Process
                 if targetNPC and targetFoodName then
+                    -- Log targeting info
+                    if not IsNPCSeated(targetNPC.npc) then
+                        debugLog("[TARGET] " .. targetNPC.identity .. " at Slot " .. targetSlot .. " (Walking - waiting for seat...)")
+                    else
+                        debugLog("[TARGET] " .. targetNPC.identity .. " at Slot " .. targetSlot .. " (Seated - serving " .. targetFoodName .. ")")
+                    end
+                    
                     local seatTimeout = 0
                     while not IsNPCSeated(targetNPC.npc) and seatTimeout < 8 do
                         task.wait(0.5)
                         seatTimeout = seatTimeout + 0.5
                     end
                     
+                    -- Check if they seated in time
+                    if not IsNPCSeated(targetNPC.npc) then
+                        debugLog("[TIMEOUT] " .. targetNPC.identity .. " failed to seat within 8s. Recycling plot...")
+                        pcall(function()
+                            OpenPlot:FireServer(false)
+                            task.wait(1)
+                            OpenPlot:FireServer(true)
+                        end)
+                        task.wait(8)
+                        return
+                    end
+                    
                     local success = Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, targetRecipe, targetFish, EquipPlate, RequestRestaurauntData, AutoServe.AutoCookModule)
                     if success then
-                        debugLog("Fulfillment complete! Adding unique NPC instance to memory cache.")
+                        debugLog("[SUCCESS] Served " .. targetFoodName .. " to " .. targetNPC.identity .. ". Caching for 75s...")
                         servedNPCsMemory[targetNPC.npc] = os.time()
                         task.wait(2)
                     else
-                        debugLog("Failed to serve target. Clearing stall structure.")
+                        debugLog("[ERROR] Failed to serve " .. targetFoodName .. " to " .. targetNPC.identity .. " (missing ingredients). Recycling plot...")
                         pcall(function()
                             OpenPlot:FireServer(false)
                             task.wait(1)
