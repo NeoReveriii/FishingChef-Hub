@@ -14,11 +14,20 @@ AutoServe.Config = {
     ServeSpecialGuests = false,
     SelectedVIPs = {}, -- Array of selected VIP names
     
-    -- Normal NPC Order Configuration
+    -- Normal NPC Order Configuration - separate fish for each recipe
     NormalOrder = {
-        Recipe = "Sashimi",          -- Options: "Sashimi", "Sushi", "Nigiri"
-        Fish = "salmon",             -- Internal fish name string to use
-        DisplayName = "Salmon Sashimi" -- Display name of tool
+        Sashimi = {
+            Fish = "salmon",
+            DisplayName = "Salmon Sashimi"
+        },
+        Nigiri = {
+            Fish = "tuna",
+            DisplayName = "Tuna Nigiri"
+        },
+        Sushi = {
+            Fish = "shrimp",
+            DisplayName = "Shrimp Sushi"
+        }
     }
 }
 
@@ -267,6 +276,27 @@ local function GetNPCIdentity(npc)
     end
     
     return npc.Name or "Unknown Customer"
+end
+
+-- Get NPC Requested Recipe (for normal NPCs)
+local function GetNPCRequestedRecipe(npc)
+    local requestedDish = npc:FindFirstChild("RequestedDish")
+    if requestedDish and requestedDish.Value then
+        local dishName = tostring(requestedDish.Value)
+        -- Normalize to match our recipe names
+        if dishName:find("Sashimi") then return "Sashimi" end
+        if dishName:find("Nigiri") then return "Nigiri" end
+        if dishName:find("Sushi") then return "Sushi" end
+    end
+    
+    -- Fallback: check identity for hints
+    local identity = GetNPCIdentity(npc)
+    if identity:find("Sashimi") then return "Sashimi" end
+    if identity:find("Nigiri") then return "Nigiri" end
+    if identity:find("Sushi") then return "Sushi" end
+    
+    -- Default to Sashimi if no indication
+    return "Sashimi"
 end
 
 -- Check if NPC is seated
@@ -564,14 +594,16 @@ function AutoServe.Start()
                 if not targetNPC and AutoServe.Config.ServeNormalNPCs then
                     if slot1 and not servedNPCsMemory[slot1.npc] then
                         targetNPC = slot1; targetSlot = 1
-                        targetFoodName = AutoServe.Config.NormalOrder.DisplayName
-                        targetRecipe = AutoServe.Config.NormalOrder.Recipe
-                        targetFish = AutoServe.Config.NormalOrder.Fish
+                        local requestedRecipe = GetNPCRequestedRecipe(slot1.npc)
+                        targetRecipe = requestedRecipe
+                        targetFish = AutoServe.Config.NormalOrder[requestedRecipe].Fish
+                        targetFoodName = AutoServe.Config.NormalOrder[requestedRecipe].DisplayName
                     elseif slot2 and not servedNPCsMemory[slot2.npc] then
                         targetNPC = slot2; targetSlot = 2
-                        targetFoodName = AutoServe.Config.NormalOrder.DisplayName
-                        targetRecipe = AutoServe.Config.NormalOrder.Recipe
-                        targetFish = AutoServe.Config.NormalOrder.Fish
+                        local requestedRecipe = GetNPCRequestedRecipe(slot2.npc)
+                        targetRecipe = requestedRecipe
+                        targetFish = AutoServe.Config.NormalOrder[requestedRecipe].Fish
+                        targetFoodName = AutoServe.Config.NormalOrder[requestedRecipe].DisplayName
                     end
                 end
                 
