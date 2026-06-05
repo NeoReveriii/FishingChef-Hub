@@ -2,10 +2,21 @@ local AutoSell = {}
 local loopThread = nil
 
 -- Configuration States
-AutoSell.Enabled      = false
-AutoSell.SelectedFish = {}   -- Array of fish Name strings to sell (empty = sell ALL)
-AutoSell.Interval     = 10   -- Seconds between each auto-sell cycle
-AutoSell.AllFishTypes = {}   -- Populated at runtime by FetchAllFishTypes()
+AutoSell.Enabled        = false
+AutoSell.SelectedFish   = {}   -- Array of fish Name strings to sell (empty = sell ALL)
+AutoSell.SelectedRarity = {}  -- Array of rarity strings to sell (empty = sell ALL rarities)
+AutoSell.Interval       = 10   -- Seconds between each auto-sell cycle
+AutoSell.AllFishTypes   = {}   -- Populated at runtime by FetchAllFishTypes()
+
+-- Available rarities
+AutoSell.RARITIES = {
+    "Common",
+    "Uncommon",
+    "Rare",
+    "Legendary",
+    "Mythical",
+    "Exotic"
+}
 
 -- ─────────────────────────────────────────
 -- FetchAllFishTypes()
@@ -118,16 +129,25 @@ function AutoSell.SellNow()
         return -1
     end
 
-    -- Build lookup set from selected fish
+    -- Build lookup sets from selected fish and rarities
     local sellSet = {}
-    local sellAll = (#AutoSell.SelectedFish == 0)
-    if not sellAll then
+    local raritySet = {}
+    local sellAllFish = (#AutoSell.SelectedFish == 0)
+    local sellAllRarity = (#AutoSell.SelectedRarity == 0)
+    
+    if not sellAllFish then
         for _, name in ipairs(AutoSell.SelectedFish) do
             sellSet[string.lower(name)] = true
         end
     end
+    
+    if not sellAllRarity then
+        for _, rarity in ipairs(AutoSell.SelectedRarity) do
+            raritySet[string.lower(rarity)] = true
+        end
+    end
 
-    -- Build sell batch — skip favorites
+    -- Build sell batch — skip favorites and filter by fish type and rarity
     local batch = {}
     for _, item in pairs(inventory) do
         if item.Favorite then continue end
@@ -136,7 +156,19 @@ function AutoSell.SellNow()
         if not fishName then continue end
 
         local lowerName = string.lower(fishName)
-        if sellAll or sellSet[lowerName] then
+        local fishMatch = sellAllFish or sellSet[lowerName]
+        
+        -- Check rarity match
+        local rarityMatch = sellAllRarity
+        if not rarityMatch then
+            local itemRarity = item.Rarity or item.rarity or item.Tier or item.tier
+            if itemRarity then
+                rarityMatch = raritySet[string.lower(tostring(itemRarity))]
+            end
+        end
+        
+        -- Item must match both fish selection AND rarity selection
+        if fishMatch and rarityMatch then
             table.insert(batch, {
                 ID     = item.ID,
                 Name   = fishName,

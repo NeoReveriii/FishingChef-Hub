@@ -148,6 +148,18 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Modul
     -- Auto-populate on load
     refreshSellFishList(nil)
 
+    -- Rarity selection dropdown
+    UI_Module.AddDropdown(
+        SellPage,
+        "Target Rarities",
+        {"Common", "Uncommon", "Rare", "Legendary", "Mythical", "Exotic"},
+        true,  -- multiSelect
+        function(choices)
+            Sell_Module.SelectedRarity = choices
+            print("[AutoSell]: Target rarities -> " .. table.concat(choices, ", "))
+        end
+    )
+
     UI_Module.AddNumberInput(
         SellPage,
         "Sell Interval (seconds)",
