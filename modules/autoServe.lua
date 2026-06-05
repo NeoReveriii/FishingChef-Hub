@@ -428,14 +428,6 @@ local function Phase1_RadarDetection(OpenPlot)
                     identity = identity,
                     horizontalOffset = horizontalOffset
                 })
-                
-                if IsNPCSeated(npc) then
-                    debugLog("[✔ SEATED] " .. identity)
-                elseif IsAtCounter(npc) then
-                    debugLog("[📍 STANDING AT COUNTER] " .. identity)
-                else
-                    debugLog("[⏳ WALKING] " .. identity .. " (Approaching...)")
-                end
             end
         end
     end
@@ -505,7 +497,6 @@ local function Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, ta
             return true
         end
     end
-    debugLog("[INVENTORY] Backpack tools: " .. table.concat(backpackTools, ", "))
     
     for _, tool in ipairs(character:GetChildren()) do
         if tool:IsA("Tool") then
@@ -641,7 +632,7 @@ function AutoServe.Start()
     if loopThread then task.cancel(loopThread) end
     AutoServe.Enabled = true
     
-    print("[AutoServe]: Started Main Loop with Ghost-Filtering Configuration.")
+    print("[AutoServe]: Started Main Loop with Non-Blocking Position Validations.")
     
     loopThread = task.spawn(function()
         local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -654,8 +645,6 @@ function AutoServe.Start()
         
         while AutoServe.Enabled do
             local loopsucceeded, errorMsg = pcall(function()
-                local currentTime = os.time()
-                
                 -- Check Seats
                 local slot1, slot2 = Phase1_RadarDetection(OpenPlot)
                 
@@ -689,12 +678,15 @@ function AutoServe.Start()
                 if AutoServe.Config.ServeSpecialGuests and #AutoServe.Config.SelectedVIPs > 0 then
                     for _, entry in ipairs(availableTargets) do
                         if entry.data.identity and not servedNPCsMemory[entry.data.npc] then
-                            for _, vipName in ipairs(AutoServe.Config.SelectedVIPs) do
-                                if entry.data.identity:find(vipName) then
-                                    targetNPC = entry.data; targetSlot = entry.id
-                                    local vipOrder = VIP_ORDERS[vipName]
-                                    targetFoodName = vipOrder.displayName; targetRecipe = vipOrder.recipe; targetFish = vipOrder.fish
-                                    break
+                            -- NON-BLOCKING CONDITION: Only target if they have safely arrived at their objective position
+                            if IsNPCSeated(entry.data.npc) or IsAtCounter(entry.data.npc) then
+                                for _, vipName in ipairs(AutoServe.Config.SelectedVIPs) do
+                                    if entry.data.identity:find(vipName) then
+                                        targetNPC = entry.data; targetSlot = entry.id
+                                        local vipOrder = VIP_ORDERS[vipName]
+                                        targetFoodName = vipOrder.displayName; targetRecipe = vipOrder.recipe; targetFish = vipOrder.fish
+                                        break
+                                    end
                                 end
                             end
                         end
@@ -706,30 +698,45 @@ function AutoServe.Start()
                 if not targetNPC and AutoServe.Config.ServeNormalNPCs then
                     for _, entry in ipairs(availableTargets) do
                         if not servedNPCsMemory[entry.data.npc] then
-                            local requestedRecipe = GetNPCRequestedRecipe(entry.data.npc)
-                            if requestedRecipe and AutoServe.Config.NormalOrder[requestedRecipe] then
-                                targetNPC = entry.data; targetSlot = entry.id; targetRecipe = requestedRecipe
-                                targetFish = AutoServe.Config.NormalOrder[requestedRecipe].Fish
-                                targetFoodName = AutoServe.Config.NormalOrder[requestedRecipe].DisplayName
-                                break
+                            -- NON-BLOCKING CONDITION: Skip walking customers instantly to evaluate other slots
+                            if IsNPCSeated(entry.data.npc) or IsAtCounter(entry.data.npc) then
+                                local requestedRecipe = GetNPCRequestedRecipe(entry.data.npc)
+                                if requestedRecipe and AutoServe.Config.NormalOrder[requestedRecipe] then
+                                    targetNPC = entry.data; targetSlot = entry.id; targetRecipe = requestedRecipe
+                                    targetFish = AutoServe.Config.NormalOrder[requestedRecipe].Fish
+                                    targetFoodName = AutoServe.Config.NormalOrder[requestedRecipe].DisplayName
+                                    break
+                                end
                             end
                         end
                     end
                 end
                 
-                -- Scenario C: Cycle Plot (No targets matched or unwanted customers occupying seats)
+                -- Scenario C: Cycle Plot (If customers are standing/seated but orders aren't matched or already served)
                 if not targetNPC then
-                    local reason = "No valid targets found"
-                    if slot1 or slot2 then
-                        reason = "All seated customers already served in this cycle"
+                    -- Let walking customers finish their walk paths safely without resetting the stall immediately
+                    local anyWalking = false
+                    for _, entry in ipairs(availableTargets) do
+                        if not IsNPCSeated(entry.data.npc) and not IsAtCounter(entry.data.npc) then
+                            anyWalking = true
+                            break
+                        end
                     end
-                    debugLog("[HUMAN COMPLIANCE] " .. reason .. ". Cycling stall cautiously...")
+                    
+                    if anyWalking then
+                        -- Instantly continue loop to poll next sub-second without cycling plot
+                        task.wait(0.5)
+                        return
+                    end
+                    
+                    -- If everyone is fully seated but nothing targets, cycle plot cleanly with highly compliant long delays
+                    debugLog("[HUMAN COMPLIANCE] Seated customers already fulfilled or unmatched. Cycling stall safely...")
                     pcall(function()
                         OpenPlot:FireServer(false)
-                        task.wait(6) -- Doubled wait time to prevent suspicious rapid updates
+                        task.wait(8) -- Anti-detection cooldown extension (8s close)
                         OpenPlot:FireServer(true)
                     end)
-                    task.wait(12) -- Massive rest step to let incoming paths recalculate smoothly
+                    task.wait(14) -- Master interval break to allow the server to dispatch paths safely
                     return
                 end
                 
@@ -737,40 +744,22 @@ function AutoServe.Start()
                 if targetNPC and targetFoodName then
                     debugLog("[TARGETING] Processing " .. targetNPC.identity .. " at Slot " .. targetSlot)
                     
-                    local seatTimeout = 0
-                    -- CRITICAL CRITERIA UPDATE: Loop holds while unseated, BUT releases immediately if customer arrives at the counter!
-                    while not IsNPCSeated(targetNPC.npc) and not IsAtCounter(targetNPC.npc) and seatTimeout < 15 do
-                        task.wait(1)
-                        seatTimeout = seatTimeout + 1
-                    end
+                    local served = Phase2_SmartFulfillment(
+                        targetNPC, targetFoodName, targetSlot, targetRecipe, targetFish, 
+                        EquipPlate, RequestRestaurauntData, AutoServe.AutoCookModule
+                    )
                     
-                    -- Overrule check: If they are right at the counter, bypass sitting locks completely!
-                    if IsNPCSeated(targetNPC.npc) or IsAtCounter(targetNPC.npc) then
-                        local served = Phase2_SmartFulfillment(
-                            targetNPC, targetFoodName, targetSlot, targetRecipe, targetFish, 
-                            EquipPlate, RequestRestaurauntData, AutoServe.AutoCookModule
-                        )
-                        
-                        if served then
-                            servedNPCsMemory[targetNPC.npc] = os.time()
-                            task.wait(2.5)
-                        else
-                            pcall(function()
-                                OpenPlot:FireServer(false)
-                                task.wait(5)
-                                OpenPlot:FireServer(true)
-                            end)
-                            task.wait(8)
-                        end
+                    if served then
+                        servedNPCsMemory[targetNPC.npc] = os.time()
+                        task.wait(3.5) -- Extended post-delivery cooldown to maintain non-suspicious patterns
                     else
-                        -- True timeout fallback if they get physically stuck down the street
-                        debugLog("[TIMEOUT] Target completely stuck on pathing network. Recycling plot...")
+                        -- Cautious handling if cooking checks came back empty handed
                         pcall(function()
                             OpenPlot:FireServer(false)
-                            task.wait(5)
+                            task.wait(8)
                             OpenPlot:FireServer(true)
                         end)
-                        task.wait(8)
+                        task.wait(14)
                     end
                 end
             end)
@@ -778,7 +767,7 @@ function AutoServe.Start()
             if not loopsucceeded then
                 debugLog("Loop encountered runtime error: " .. tostring(errorMsg))
             end
-            task.wait(1.5) -- Master interval padding
+            task.wait(0.5) -- Swift loop rate for responsive non-blocking tracking
         end
     end)
 end
