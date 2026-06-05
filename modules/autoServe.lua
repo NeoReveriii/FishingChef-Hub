@@ -273,7 +273,7 @@ local function IsAtCounter(npc)
     
     if plotBase then
         -- If customer is physically within serving range of the counter, count them as ready
-        return (pos - plotBase).Magnitude < 25
+        return (pos - plotBase).Magnitude < 45
     end
     return false
 end
