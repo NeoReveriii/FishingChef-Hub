@@ -114,8 +114,9 @@ local function ServeFood(npcInstance, foodName, targetSeatSlot)
     if humanoid then
         -- Check if food tool is already equipped
         local foodEquipped = false
+        local foodNameLower = string.gsub(string.lower(foodName), "_", " ")
         for _, tool in ipairs(character:GetChildren()) do
-            if tool:IsA("Tool") and string.lower(tool.Name) == string.lower(foodName) then
+            if tool:IsA("Tool") and string.gsub(string.lower(tool.Name), "_", " ") == foodNameLower then
                 foodEquipped = true
                 break
             end
@@ -124,9 +125,9 @@ local function ServeFood(npcInstance, foodName, targetSeatSlot)
         -- If not equipped, try to equip from backpack
         if not foodEquipped then
             for _, tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
-                if string.lower(tool.Name) == string.lower(foodName) then
+                if string.gsub(string.lower(tool.Name), "_", " ") == foodNameLower then
                     humanoid:EquipTool(tool)
-                    task.wait(0.3) -- Wait for equip to complete
+                    task.wait(0.5) -- Extended humanlike delay
                     foodEquipped = true
                     break
                 end
@@ -439,10 +440,10 @@ local function Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, ta
     
     debugLog("[INVENTORY] Searching for: " .. targetFoodName .. " (Recipe: " .. targetRecipe .. ", Fish: " .. tostring(targetFish) .. ")")
     
-    -- Convert tracking strings to lowercase for completely case-insensitive matching
-    local lowerFoodName = string.lower(targetFoodName)
+    -- Convert tracking strings to lowercase and remove underscores for matching
+    local lowerFoodName = string.gsub(string.lower(targetFoodName), "_", " ")
     local lowerRecipe = string.lower(targetRecipe)
-    local lowerFish = string.lower(targetFish or "")
+    local lowerFish = string.gsub(string.lower(targetFish or ""), "_", " ")
 
     local function safeEquipTool(tool)
         local equippedCount = 0
@@ -466,7 +467,7 @@ local function Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, ta
     -- Check Hotbar (Backpack)
     local backpackTools = {}
     for _, tool in ipairs(backpack:GetChildren()) do
-        local toolNameLower = string.lower(tool.Name)
+        local toolNameLower = string.gsub(string.lower(tool.Name), "_", " ")
         table.insert(backpackTools, tool.Name)
         -- Check for exact match first
         if toolNameLower == lowerFoodName then
@@ -475,7 +476,7 @@ local function Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, ta
             ServeFood(targetNPC.npc, tool.Name, targetSlot)
             return true
         end
-        -- Check for partial match (case-insensitive)
+        -- Check for partial match (case-insensitive, underscore-insensitive)
         if toolNameLower:find(lowerRecipe) and toolNameLower:find(lowerFish) then
             debugLog("[INVENTORY] Found partial match in backpack: " .. tool.Name .. " (Target: " .. targetFoodName .. ")")
             safeEquipTool(tool)
@@ -487,13 +488,13 @@ local function Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, ta
     
     for _, tool in ipairs(character:GetChildren()) do
         if tool:IsA("Tool") then
-            local toolNameLower = string.lower(tool.Name)
+            local toolNameLower = string.gsub(string.lower(tool.Name), "_", " ")
             if toolNameLower == lowerFoodName then
                 debugLog("[INVENTORY] Found on character: " .. tool.Name)
                 ServeFood(targetNPC.npc, tool.Name, targetSlot)
                 return true
             end
-            -- Check for partial match (case-insensitive)
+            -- Check for partial match (case-insensitive, underscore-insensitive)
             if toolNameLower:find(lowerRecipe) and toolNameLower:find(lowerFish) then
                 debugLog("[INVENTORY] Found partial match on character: " .. tool.Name .. " (Target: " .. targetFoodName .. ")")
                 ServeFood(targetNPC.npc, tool.Name, targetSlot)
@@ -513,7 +514,7 @@ local function Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, ta
     else
         local storageItems = {}
         for _, foodItem in ipairs(restaurantData.FoodStorage) do
-            local itemNameLower = string.lower(foodItem.Name)
+            local itemNameLower = string.gsub(string.lower(foodItem.Name), "_", " ")
             table.insert(storageItems, foodItem.Name .. " (x" .. foodItem.Amount .. ")")
             -- Check for exact match
             if itemNameLower == lowerFoodName and foodItem.Amount > 0 then
@@ -532,7 +533,7 @@ local function Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, ta
                 ServeFood(targetNPC.npc, foodItem.Name, targetSlot)
                 return true
             end
-            -- Check for partial match (case-insensitive)
+            -- Check for partial match (case-insensitive, underscore-insensitive)
             if itemNameLower:find(lowerRecipe) and itemNameLower:find(lowerFish) and foodItem.Amount > 0 then
                 debugLog("[INVENTORY] Found partial match in storage: " .. foodItem.Name .. " (Target: " .. targetFoodName .. ")")
                 pcall(function()
@@ -564,7 +565,7 @@ local function Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, ta
             -- Re-check backpack with detailed logging
             local newBackpackTools = {}
             for _, tool in ipairs(backpack:GetChildren()) do
-                local toolNameLower = string.lower(tool.Name)
+                local toolNameLower = string.gsub(string.lower(tool.Name), "_", " ")
                 table.insert(newBackpackTools, tool.Name)
                 -- Check for exact match
                 if toolNameLower == lowerFoodName then
@@ -573,7 +574,7 @@ local function Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, ta
                     ServeFood(targetNPC.npc, tool.Name, targetSlot)
                     return true
                 end
-                -- Check for partial match (case-insensitive)
+                -- Check for partial match (case-insensitive, underscore-insensitive)
                 if toolNameLower:find(lowerRecipe) and toolNameLower:find(lowerFish) then
                     debugLog("[INVENTORY] Cooked dish found (partial match): " .. tool.Name)
                     safeEquipTool(tool)
@@ -587,7 +588,7 @@ local function Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, ta
             local charTools = {}
             for _, tool in ipairs(character:GetChildren()) do
                 if tool:IsA("Tool") then
-                    local toolNameLower = string.lower(tool.Name)
+                    local toolNameLower = string.gsub(string.lower(tool.Name), "_", " ")
                     table.insert(charTools, tool.Name)
                     if toolNameLower == lowerFoodName then
                         debugLog("[INVENTORY] Cooked dish found on character: " .. tool.Name)
@@ -712,13 +713,13 @@ function AutoServe.Start()
                     if slot1 or slot2 then
                         reason = "All seated customers already served in this cycle"
                     end
-                    debugLog("[CYCLE] " .. reason .. ". Recycling plot...")
+                    debugLog("[HUMAN COMPLIANCE] " .. reason .. ". Cycling stall cautiously...")
                     pcall(function()
                         OpenPlot:FireServer(false)
-                        task.wait(5)
+                        task.wait(6) -- Doubled wait time to prevent suspicious rapid updates
                         OpenPlot:FireServer(true)
                     end)
-                    task.wait(8) -- Humanlike network rest step
+                    task.wait(12) -- Massive rest step to let incoming paths recalculate smoothly
                     return
                 end
                 
@@ -732,9 +733,9 @@ function AutoServe.Start()
                     end
                     
                     local seatTimeout = 0
-                    while not IsNPCSeated(targetNPC.npc) and seatTimeout < 8 do
-                        task.wait(0.5)
-                        seatTimeout = seatTimeout + 0.5
+                    while not IsNPCSeated(targetNPC.npc) and seatTimeout < 20 do
+                        task.wait(1)
+                        seatTimeout = seatTimeout + 1
                         
                         -- Check if other slot became seated while waiting
                         local otherSlot = (targetSlot == 1 and slot2) or slot1
@@ -756,34 +757,38 @@ function AutoServe.Start()
                     end
                     
                     if not IsNPCSeated(targetNPC.npc) then
-                        debugLog("[TIMEOUT] Customer failed to seat within 8s. Checking other slot...")
-                        -- Try to serve the other NPC if it's seated
-                        local otherSlot = (targetSlot == 1 and slot2) or slot1
-                        if otherSlot and IsNPCSeated(otherSlot.npc) and not servedNPCsMemory[otherSlot.npc] then
-                            local requestedRecipe = GetNPCRequestedRecipe(otherSlot.npc)
-                            if requestedRecipe and AutoServe.Config.NormalOrder[requestedRecipe] then
-                                debugLog("[FALLBACK] Serving other seated NPC: " .. otherSlot.identity)
-                                targetNPC = otherSlot
-                                targetSlot = (targetSlot == 1 and 2) or 1
-                                targetRecipe = requestedRecipe
-                                targetFish = AutoServe.Config.NormalOrder[requestedRecipe].Fish
-                                targetFoodName = AutoServe.Config.NormalOrder[requestedRecipe].DisplayName
-                                debugLog("[TARGET] " .. targetNPC.identity .. " at Slot " .. targetSlot .. " (Seated - serving " .. targetFoodName .. ")")
-                            else
-                                debugLog("[FALLBACK] Other NPC seated but could not read order: " .. otherSlot.identity)
+                        debugLog("[HUMAN COMPLIANCE] NPC didn't sit in time. Giving extra grace period...")
+                        task.wait(4)
+                        if not IsNPCSeated(targetNPC.npc) then
+                            debugLog("[TIMEOUT] Customer failed to seat within 24s. Checking other slot...")
+                            -- Try to serve the other NPC if it's seated
+                            local otherSlot = (targetSlot == 1 and slot2) or slot1
+                            if otherSlot and IsNPCSeated(otherSlot.npc) and not servedNPCsMemory[otherSlot.npc] then
+                                local requestedRecipe = GetNPCRequestedRecipe(otherSlot.npc)
+                                if requestedRecipe and AutoServe.Config.NormalOrder[requestedRecipe] then
+                                    debugLog("[FALLBACK] Serving other seated NPC: " .. otherSlot.identity)
+                                    targetNPC = otherSlot
+                                    targetSlot = (targetSlot == 1 and 2) or 1
+                                    targetRecipe = requestedRecipe
+                                    targetFish = AutoServe.Config.NormalOrder[requestedRecipe].Fish
+                                    targetFoodName = AutoServe.Config.NormalOrder[requestedRecipe].DisplayName
+                                    debugLog("[TARGET] " .. targetNPC.identity .. " at Slot " .. targetSlot .. " (Seated - serving " .. targetFoodName .. ")")
+                                else
+                                    debugLog("[FALLBACK] Other NPC seated but could not read order: " .. otherSlot.identity)
+                                end
                             end
-                        end
-                        
-                        -- If still no valid target, force plot recycle
-                        if not IsNPCSeated(targetNPC.npc) or not targetRecipe then
-                            debugLog("[TIMEOUT] No seated NPCs available or could not read orders. Forcing plot recycle...")
-                            pcall(function()
-                                OpenPlot:FireServer(false)
-                                task.wait(4)
-                                OpenPlot:FireServer(true)
-                            end)
-                            task.wait(6) -- Give network/NPCs time to clear out safely
-                            return
+                            
+                            -- If still no valid target, force plot recycle
+                            if not IsNPCSeated(targetNPC.npc) or not targetRecipe then
+                                debugLog("[TIMEOUT] No seated NPCs available or could not read orders. Forcing plot recycle...")
+                                pcall(function()
+                                    OpenPlot:FireServer(false)
+                                    task.wait(6)
+                                    OpenPlot:FireServer(true)
+                                end)
+                                task.wait(10)
+                                return
+                            end
                         end
                     end
                     
@@ -801,15 +806,15 @@ function AutoServe.Start()
                     
                     if served then
                         servedNPCsMemory[targetNPC.npc] = os.time()
-                        task.wait(1.5)
+                        task.wait(3) -- Anti-detection delay following successful action
                     else
                         debugLog("[ERROR] Failed to serve " .. targetFoodName .. " to Customer (missing ingredients). Recycling plot...")
                         pcall(function()
                             OpenPlot:FireServer(false)
-                            task.wait(3)
+                            task.wait(6)
                             OpenPlot:FireServer(true)
                         end)
-                        task.wait(5)
+                        task.wait(10)
                     end
                 end
             end)
@@ -817,7 +822,7 @@ function AutoServe.Start()
             if not loopsucceeded then
                 debugLog("Loop encountered runtime error: " .. tostring(errorMsg))
             end
-            task.wait(0.5)
+            task.wait(1.5) -- Master interval padding
         end
     end)
 end
