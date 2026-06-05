@@ -273,23 +273,56 @@ end
 
 -- Get NPC Requested Recipe (for normal NPCs)
 local function GetNPCRequestedRecipe(npc)
+    local dishName = ""
+    
+    -- Check 1: Value Object
     local requestedDish = npc:FindFirstChild("RequestedDish")
     if requestedDish and requestedDish.Value then
-        local dishName = tostring(requestedDish.Value)
-        -- Normalize to match our recipe names
-        if dishName:find("Sashimi") then return "Sashimi" end
-        if dishName:find("Nigiri") then return "Nigiri" end
-        if dishName:find("Sushi") then return "Sushi" end
+        dishName = tostring(requestedDish.Value)
+    else
+        -- Check 2: Try Attributes if the Value Object doesn't exist
+        local attr = npc:GetAttribute("RequestedDish") or npc:GetAttribute("Order")
+        if attr then dishName = tostring(attr) end
+    end
+    
+    -- Check 3: Scan UI/BillboardGui for order text
+    if dishName == "" then
+        local charVal = npc:FindFirstChild("CHAR")
+        if charVal and charVal.Value then
+            local model = charVal.Value
+            for _, descendant in ipairs(model:GetDescendants()) do
+                if descendant:IsA("BillboardGui") or descendant:IsA("SurfaceGui") then
+                    for _, textLabel in ipairs(descendant:GetDescendants()) do
+                        if textLabel:IsA("TextLabel") or textLabel:IsA("TextBox") then
+                            local text = string.lower(textLabel.Text)
+                            if text:find("sashimi") or text:find("nigiri") or text:find("sushi") then
+                                dishName = textLabel.Text
+                                break
+                            end
+                        end
+                    end
+                    if dishName ~= "" then break end
+                end
+            end
+        end
+    end
+    
+    -- Normalize the text found
+    if dishName ~= "" then
+        dishName = string.lower(dishName)
+        if dishName:find("sashimi") then return "Sashimi" end
+        if dishName:find("nigiri") then return "Nigiri" end
+        if dishName:find("sushi") then return "Sushi" end
     end
     
     -- Fallback: check identity for hints
-    local identity = GetNPCIdentity(npc)
-    if identity:find("Sashimi") then return "Sashimi" end
-    if identity:find("Nigiri") then return "Nigiri" end
-    if identity:find("Sushi") then return "Sushi" end
+    local identity = string.lower(GetNPCIdentity(npc))
+    if identity:find("sashimi") then return "Sashimi" end
+    if identity:find("nigiri") then return "Nigiri" end
+    if identity:find("sushi") then return "Sushi" end
     
-    -- Default to Sashimi if no indication
-    return "Sashimi"
+    -- DO NOT DEFAULT! Return nil so the script knows it failed to read it.
+    return nil
 end
 
 -- Check if NPC is seated
@@ -651,17 +684,25 @@ function AutoServe.Start()
                 -- Branch B: Normal Serving Mode (Priority 2 - only runs if VIP mode didn't find target)
                 if not targetNPC and AutoServe.Config.ServeNormalNPCs then
                     if slot1 and not servedNPCsMemory[slot1.npc] then
-                        targetNPC = slot1; targetSlot = 1
                         local requestedRecipe = GetNPCRequestedRecipe(slot1.npc)
-                        targetRecipe = requestedRecipe
-                        targetFish = AutoServe.Config.NormalOrder[requestedRecipe].Fish
-                        targetFoodName = AutoServe.Config.NormalOrder[requestedRecipe].DisplayName
+                        if requestedRecipe and AutoServe.Config.NormalOrder[requestedRecipe] then
+                            targetNPC = slot1; targetSlot = 1
+                            targetRecipe = requestedRecipe
+                            targetFish = AutoServe.Config.NormalOrder[requestedRecipe].Fish
+                            targetFoodName = AutoServe.Config.NormalOrder[requestedRecipe].DisplayName
+                        else
+                            debugLog("[SKIP] Could not read order for Slot 1 NPC: " .. slot1.identity)
+                        end
                     elseif slot2 and not servedNPCsMemory[slot2.npc] then
-                        targetNPC = slot2; targetSlot = 2
                         local requestedRecipe = GetNPCRequestedRecipe(slot2.npc)
-                        targetRecipe = requestedRecipe
-                        targetFish = AutoServe.Config.NormalOrder[requestedRecipe].Fish
-                        targetFoodName = AutoServe.Config.NormalOrder[requestedRecipe].DisplayName
+                        if requestedRecipe and AutoServe.Config.NormalOrder[requestedRecipe] then
+                            targetNPC = slot2; targetSlot = 2
+                            targetRecipe = requestedRecipe
+                            targetFish = AutoServe.Config.NormalOrder[requestedRecipe].Fish
+                            targetFoodName = AutoServe.Config.NormalOrder[requestedRecipe].DisplayName
+                        else
+                            debugLog("[SKIP] Could not read order for Slot 2 NPC: " .. slot2.identity)
+                        end
                     end
                 end
                 
@@ -698,15 +739,19 @@ function AutoServe.Start()
                         -- Check if other slot became seated while waiting
                         local otherSlot = (targetSlot == 1 and slot2) or slot1
                         if otherSlot and IsNPCSeated(otherSlot.npc) and not servedNPCsMemory[otherSlot.npc] then
-                            debugLog("[SWITCH] Other NPC seated while waiting: " .. otherSlot.identity .. " at Slot " .. (targetSlot == 1 and 2 or 1))
-                            targetNPC = otherSlot
-                            targetSlot = (targetSlot == 1 and 2) or 1
-                            local requestedRecipe = GetNPCRequestedRecipe(targetNPC.npc)
-                            targetRecipe = requestedRecipe
-                            targetFish = AutoServe.Config.NormalOrder[requestedRecipe].Fish
-                            targetFoodName = AutoServe.Config.NormalOrder[requestedRecipe].DisplayName
-                            debugLog("[TARGET] Switched to " .. targetNPC.identity .. " at Slot " .. targetSlot .. " (Seated - serving " .. targetFoodName .. ")")
-                            break
+                            local requestedRecipe = GetNPCRequestedRecipe(otherSlot.npc)
+                            if requestedRecipe and AutoServe.Config.NormalOrder[requestedRecipe] then
+                                debugLog("[SWITCH] Other NPC seated while waiting: " .. otherSlot.identity .. " at Slot " .. (targetSlot == 1 and 2 or 1))
+                                targetNPC = otherSlot
+                                targetSlot = (targetSlot == 1 and 2) or 1
+                                targetRecipe = requestedRecipe
+                                targetFish = AutoServe.Config.NormalOrder[requestedRecipe].Fish
+                                targetFoodName = AutoServe.Config.NormalOrder[requestedRecipe].DisplayName
+                                debugLog("[TARGET] Switched to " .. targetNPC.identity .. " at Slot " .. targetSlot .. " (Seated - serving " .. targetFoodName .. ")")
+                                break
+                            else
+                                debugLog("[SWITCH] Other NPC seated but could not read order: " .. otherSlot.identity)
+                            end
                         end
                     end
                     
@@ -715,16 +760,23 @@ function AutoServe.Start()
                         -- Try to serve the other NPC if it's seated
                         local otherSlot = (targetSlot == 1 and slot2) or slot1
                         if otherSlot and IsNPCSeated(otherSlot.npc) and not servedNPCsMemory[otherSlot.npc] then
-                            debugLog("[FALLBACK] Serving other seated NPC: " .. otherSlot.identity)
-                            targetNPC = otherSlot
-                            targetSlot = (targetSlot == 1 and 2) or 1
-                            local requestedRecipe = GetNPCRequestedRecipe(targetNPC.npc)
-                            targetRecipe = requestedRecipe
-                            targetFish = AutoServe.Config.NormalOrder[requestedRecipe].Fish
-                            targetFoodName = AutoServe.Config.NormalOrder[requestedRecipe].DisplayName
-                            debugLog("[TARGET] " .. targetNPC.identity .. " at Slot " .. targetSlot .. " (Seated - serving " .. targetFoodName .. ")")
-                        else
-                            debugLog("[TIMEOUT] No seated NPCs available. Forcing plot recycle...")
+                            local requestedRecipe = GetNPCRequestedRecipe(otherSlot.npc)
+                            if requestedRecipe and AutoServe.Config.NormalOrder[requestedRecipe] then
+                                debugLog("[FALLBACK] Serving other seated NPC: " .. otherSlot.identity)
+                                targetNPC = otherSlot
+                                targetSlot = (targetSlot == 1 and 2) or 1
+                                targetRecipe = requestedRecipe
+                                targetFish = AutoServe.Config.NormalOrder[requestedRecipe].Fish
+                                targetFoodName = AutoServe.Config.NormalOrder[requestedRecipe].DisplayName
+                                debugLog("[TARGET] " .. targetNPC.identity .. " at Slot " .. targetSlot .. " (Seated - serving " .. targetFoodName .. ")")
+                            else
+                                debugLog("[FALLBACK] Other NPC seated but could not read order: " .. otherSlot.identity)
+                            end
+                        end
+                        
+                        -- If still no valid target, force plot recycle
+                        if not IsNPCSeated(targetNPC.npc) or not targetRecipe then
+                            debugLog("[TIMEOUT] No seated NPCs available or could not read orders. Forcing plot recycle...")
                             pcall(function()
                                 OpenPlot:FireServer(false)
                                 task.wait(4)
