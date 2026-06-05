@@ -508,7 +508,13 @@ local function Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, ta
     
     -- Check Storage Inventory
     local success, restaurantData = pcall(function() return RequestRestaurauntData:InvokeServer() end)
-    if success and restaurantData and restaurantData.FoodStorage then
+    if not success then
+        debugLog("[INVENTORY] Failed to fetch restaurant storage data (network error)")
+    elseif not restaurantData then
+        debugLog("[INVENTORY] Restaurant data returned nil")
+    elseif not restaurantData.FoodStorage then
+        debugLog("[INVENTORY] Restaurant data has no FoodStorage field")
+    else
         local storageItems = {}
         for _, foodItem in ipairs(restaurantData.FoodStorage) do
             table.insert(storageItems, foodItem.Name .. " (x" .. foodItem.Amount .. ")")
@@ -548,8 +554,6 @@ local function Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, ta
             end
         end
         debugLog("[INVENTORY] Storage items: " .. table.concat(storageItems, ", "))
-    else
-        debugLog("[INVENTORY] Failed to fetch restaurant storage data")
     end
     
     -- Auto Cook Execution
@@ -557,14 +561,50 @@ local function Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, ta
         debugLog("[INVENTORY] Not found, attempting to cook: " .. targetRecipe .. " with " .. targetFish)
         local cookSuccess = pcall(function() return AutoCookModule.CookSingle(targetRecipe, targetFish) end)
         if cookSuccess then
-            task.wait(1)
+            debugLog("[INVENTORY] Cook successful, waiting for dish to appear...")
+            task.wait(2) -- Increased wait time for dish to appear
+            
+            -- Re-check backpack with detailed logging
+            local newBackpackTools = {}
             for _, tool in ipairs(backpack:GetChildren()) do
+                table.insert(newBackpackTools, tool.Name)
+                -- Check for exact match
                 if tool.Name == targetFoodName then
+                    debugLog("[INVENTORY] Cooked dish found in backpack: " .. tool.Name)
                     safeEquipTool(tool)
                     ServeFood(targetNPC.npc, targetFoodName, targetSlot)
                     return true
                 end
+                -- Check for partial match
+                if tool.Name:find(targetRecipe) and tool.Name:find(targetFish or "") then
+                    debugLog("[INVENTORY] Cooked dish found (partial match): " .. tool.Name)
+                    safeEquipTool(tool)
+                    ServeFood(targetNPC.npc, tool.Name, targetSlot)
+                    return true
+                end
             end
+            debugLog("[INVENTORY] Backpack after cooking: " .. table.concat(newBackpackTools, ", "))
+            
+            -- Check character as well
+            local charTools = {}
+            for _, tool in ipairs(character:GetChildren()) do
+                if tool:IsA("Tool") then
+                    table.insert(charTools, tool.Name)
+                    if tool.Name == targetFoodName then
+                        debugLog("[INVENTORY] Cooked dish found on character: " .. tool.Name)
+                        ServeFood(targetNPC.npc, targetFoodName, targetSlot)
+                        return true
+                    end
+                    if tool.Name:find(targetRecipe) and tool.Name:find(targetFish or "") then
+                        debugLog("[INVENTORY] Cooked dish found on character (partial): " .. tool.Name)
+                        ServeFood(targetNPC.npc, tool.Name, targetSlot)
+                        return true
+                    end
+                end
+            end
+            debugLog("[INVENTORY] Character tools after cooking: " .. table.concat(charTools, ", "))
+            
+            debugLog("[INVENTORY] Cooked dish not found after cooking. Target: " .. targetFoodName)
         else
             debugLog("[INVENTORY] Auto-cook failed for: " .. targetRecipe .. " with " .. targetFish)
         end
