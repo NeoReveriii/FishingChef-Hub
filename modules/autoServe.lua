@@ -421,55 +421,39 @@ local function Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, ta
         end
     end
     
-    -- Check Storage Inventory
+    -- FIXED STORAGE CHECK: Swapped .FoodStorage parsing layout for the server's real dictionary key (.Dishes)
     local success, restaurantData = pcall(function() return RequestRestaurauntData:InvokeServer() end)
     if not success then
         debugLog("[INVENTORY] Failed to fetch restaurant storage data (network error)")
     elseif not restaurantData then
         debugLog("[INVENTORY] Restaurant data returned nil")
-    elseif not restaurantData.FoodStorage then
-        debugLog("[INVENTORY] Restaurant data has no FoodStorage field")
+    elseif not restaurantData.Dishes then
+        debugLog("[INVENTORY] Restaurant data has no Dishes field")
     else
-        local storageItems = {}
-        for _, foodItem in ipairs(restaurantData.FoodStorage) do
-            local itemNameLower = string.gsub(string.lower(foodItem.Name), "_", " ")
-            table.insert(storageItems, foodItem.Name .. " (x" .. foodItem.Amount .. ")")
-            -- Check for exact match
-            if itemNameLower == lowerFoodName and foodItem.Amount > 0 then
-                debugLog("[INVENTORY] Found in storage: " .. foodItem.Name)
-                pcall(function()
-                    EquipPlate:FireServer({
-                        CF = foodItem.CF or "unknown",
-                        Name = foodItem.Name,
-                        Amount = 1,
-                        ID = foodItem.ID,
-                        Data = foodItem.Data,
-                        Value = foodItem.Value
-                    })
-                end)
-                task.wait(0.3)
-                ServeFood(targetNPC.npc, foodItem.Name, targetSlot)
-                return true
-            end
-            -- Check for partial match (case-insensitive, underscore-insensitive)
-            if itemNameLower:find(lowerRecipe) and itemNameLower:find(lowerFish) and foodItem.Amount > 0 then
-                debugLog("[INVENTORY] Found partial match in storage: " .. foodItem.Name .. " (Target: " .. targetFoodName .. ")")
-                pcall(function()
-                    EquipPlate:FireServer({
-                        CF = foodItem.CF or "unknown",
-                        Name = foodItem.Name,
-                        Amount = 1,
-                        ID = foodItem.ID,
-                        Data = foodItem.Data,
-                        Value = foodItem.Value
-                    })
-                end)
-                task.wait(0.3)
-                ServeFood(targetNPC.npc, foodItem.Name, targetSlot)
-                return true
+        for itemID, foodItem in pairs(restaurantData.Dishes) do
+            if type(foodItem) == "table" and foodItem.Name then
+                local itemNameLower = string.gsub(string.lower(foodItem.Name), "_", " ")
+                local amountValue = tonumber(foodItem.Amount) or 0
+                
+                if (itemNameLower == lowerFoodName or (itemNameLower:find(lowerRecipe) and itemNameLower:find(lowerFish))) and amountValue > 0 then
+                    debugLog("[STORAGE] Found " .. foodItem.Name .. " inside Cabinet. ID: " .. tostring(itemID))
+                    
+                    pcall(function()
+                        EquipPlate:FireServer({
+                            CF = foodItem.CF or itemID,
+                            Name = foodItem.Name,
+                            Amount = 1,
+                            ID = tonumber(itemID) or foodItem.ID,
+                            Data = foodItem.Data or {},
+                            Value = foodItem.Value or 0
+                        })
+                    end)
+                    task.wait(0.35)
+                    ServeFood(targetNPC.npc, foodItem.Name, targetSlot)
+                    return true
+                end
             end
         end
-        debugLog("[INVENTORY] Storage items: " .. table.concat(storageItems, ", "))
     end
     
     -- Auto Cook Execution
@@ -694,5 +678,19 @@ function AutoServe.Stop()
     end
     debugLog("Module loop cleanly halted.")
 end
+
+-- ========================================================
+-- RUNTIME INITIALIZER FOR EXECUTORS / DIRECT RUNS
+-- ========================================================
+task.spawn(function()
+    -- Dynamically capture global/shared background configurations
+    if not AutoServe.AutoCookModule then
+        local mainHubCook = shared.AutoCookModule or _G.AutoCookModule
+        if mainHubCook then
+            AutoServe.AutoCookModule = mainHubCook
+        end
+    end
+    AutoServe.Start()
+end)
 
 return AutoServe
