@@ -448,6 +448,8 @@ local function Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, ta
     local backpack = LocalPlayer:WaitForChild("Backpack")
     local humanoid = character:WaitForChild("Humanoid")
     
+    debugLog("[INVENTORY] Searching for: " .. targetFoodName .. " (Recipe: " .. targetRecipe .. ", Fish: " .. tostring(targetFish) .. ")")
+    
     local function safeEquipTool(tool)
         local equippedCount = 0
         for _, child in ipairs(character:GetChildren()) do
@@ -467,27 +469,52 @@ local function Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, ta
         task.wait(0.2)
     end
     
-    -- Check Hotbar
+    -- Check Hotbar (Backpack)
+    local backpackTools = {}
     for _, tool in ipairs(backpack:GetChildren()) do
+        table.insert(backpackTools, tool.Name)
+        -- Check for exact match first
         if tool.Name == targetFoodName then
+            debugLog("[INVENTORY] Found in backpack: " .. tool.Name)
             safeEquipTool(tool)
             ServeFood(targetNPC.npc, targetFoodName, targetSlot)
             return true
         end
+        -- Check for partial match (e.g., "Sashimi" if target is "Pufferfish Sashimi")
+        if tool.Name:find(targetRecipe) and tool.Name:find(targetFish or "") then
+            debugLog("[INVENTORY] Found partial match in backpack: " .. tool.Name .. " (Target: " .. targetFoodName .. ")")
+            safeEquipTool(tool)
+            ServeFood(targetNPC.npc, tool.Name, targetSlot)
+            return true
+        end
     end
+    debugLog("[INVENTORY] Backpack tools: " .. table.concat(backpackTools, ", "))
     
     for _, tool in ipairs(character:GetChildren()) do
-        if tool:IsA("Tool") and tool.Name == targetFoodName then
-            ServeFood(targetNPC.npc, targetFoodName, targetSlot)
-            return true
+        if tool:IsA("Tool") then
+            if tool.Name == targetFoodName then
+                debugLog("[INVENTORY] Found on character: " .. tool.Name)
+                ServeFood(targetNPC.npc, targetFoodName, targetSlot)
+                return true
+            end
+            -- Check for partial match
+            if tool.Name:find(targetRecipe) and tool.Name:find(targetFish or "") then
+                debugLog("[INVENTORY] Found partial match on character: " .. tool.Name .. " (Target: " .. targetFoodName .. ")")
+                ServeFood(targetNPC.npc, tool.Name, targetSlot)
+                return true
+            end
         end
     end
     
     -- Check Storage Inventory
     local success, restaurantData = pcall(function() return RequestRestaurauntData:InvokeServer() end)
     if success and restaurantData and restaurantData.FoodStorage then
+        local storageItems = {}
         for _, foodItem in ipairs(restaurantData.FoodStorage) do
+            table.insert(storageItems, foodItem.Name .. " (x" .. foodItem.Amount .. ")")
+            -- Check for exact match
             if foodItem.Name == targetFoodName and foodItem.Amount > 0 then
+                debugLog("[INVENTORY] Found in storage: " .. foodItem.Name)
                 pcall(function()
                     EquipPlate:FireServer({
                         CF = foodItem.CF or "unknown",
@@ -502,11 +529,32 @@ local function Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, ta
                 ServeFood(targetNPC.npc, targetFoodName, targetSlot)
                 return true
             end
+            -- Check for partial match
+            if foodItem.Name:find(targetRecipe) and foodItem.Name:find(targetFish or "") and foodItem.Amount > 0 then
+                debugLog("[INVENTORY] Found partial match in storage: " .. foodItem.Name .. " (Target: " .. targetFoodName .. ")")
+                pcall(function()
+                    EquipPlate:FireServer({
+                        CF = foodItem.CF or "unknown",
+                        Name = foodItem.Name,
+                        Amount = 1,
+                        ID = foodItem.ID,
+                        Data = foodItem.Data,
+                        Value = foodItem.Value
+                    })
+                end)
+                task.wait(0.3)
+                ServeFood(targetNPC.npc, foodItem.Name, targetSlot)
+                return true
+            end
         end
+        debugLog("[INVENTORY] Storage items: " .. table.concat(storageItems, ", "))
+    else
+        debugLog("[INVENTORY] Failed to fetch restaurant storage data")
     end
     
     -- Auto Cook Execution
     if targetFish and AutoCookModule then
+        debugLog("[INVENTORY] Not found, attempting to cook: " .. targetRecipe .. " with " .. targetFish)
         local cookSuccess = pcall(function() return AutoCookModule.CookSingle(targetRecipe, targetFish) end)
         if cookSuccess then
             task.wait(1)
@@ -517,7 +565,11 @@ local function Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, ta
                     return true
                 end
             end
+        else
+            debugLog("[INVENTORY] Auto-cook failed for: " .. targetRecipe .. " with " .. targetFish)
         end
+    else
+        debugLog("[INVENTORY] No AutoCookModule or targetFish provided")
     end
     
     return false
@@ -616,7 +668,7 @@ function AutoServe.Start()
                     debugLog("[CYCLE] " .. reason .. ". Recycling plot...")
                     pcall(function()
                         OpenPlot:FireServer(false)
-                        task.wait(1)
+                        task.wait(5)
                         OpenPlot:FireServer(true)
                     end)
                     task.wait(8) -- Humanlike network rest step
@@ -640,14 +692,28 @@ function AutoServe.Start()
                     
                     -- Check if they seated in time
                     if not IsNPCSeated(targetNPC.npc) then
-                        debugLog("[TIMEOUT] " .. targetNPC.identity .. " failed to seat within 8s. Recycling plot...")
-                        pcall(function()
-                            OpenPlot:FireServer(false)
-                            task.wait(1)
-                            OpenPlot:FireServer(true)
-                        end)
-                        task.wait(8)
-                        return
+                        debugLog("[TIMEOUT] " .. targetNPC.identity .. " failed to seat within 8s. Checking other slot...")
+                        -- Try to serve the other NPC if it's seated
+                        local otherSlot = (targetSlot == 1 and slot2) or slot1
+                        if otherSlot and IsNPCSeated(otherSlot.npc) and not servedNPCsMemory[otherSlot.npc] then
+                            debugLog("[FALLBACK] Serving other seated NPC: " .. otherSlot.identity)
+                            targetNPC = otherSlot
+                            targetSlot = (targetSlot == 1 and 2) or 1
+                            local requestedRecipe = GetNPCRequestedRecipe(targetNPC.npc)
+                            targetRecipe = requestedRecipe
+                            targetFish = AutoServe.Config.NormalOrder[requestedRecipe].Fish
+                            targetFoodName = AutoServe.Config.NormalOrder[requestedRecipe].DisplayName
+                            debugLog("[TARGET] " .. targetNPC.identity .. " at Slot " .. targetSlot .. " (Seated - serving " .. targetFoodName .. ")")
+                        else
+                            debugLog("[TIMEOUT] No seated NPCs available. Recycling plot...")
+                            pcall(function()
+                                OpenPlot:FireServer(false)
+                                task.wait(5)
+                                OpenPlot:FireServer(true)
+                            end)
+                            task.wait(8)
+                            return
+                        end
                     end
                     
                     local success = Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, targetRecipe, targetFish, EquipPlate, RequestRestaurauntData, AutoServe.AutoCookModule)
@@ -659,7 +725,7 @@ function AutoServe.Start()
                         debugLog("[ERROR] Failed to serve " .. targetFoodName .. " to " .. targetNPC.identity .. " (missing ingredients). Recycling plot...")
                         pcall(function()
                             OpenPlot:FireServer(false)
-                            task.wait(1)
+                            task.wait(5)
                             OpenPlot:FireServer(true)
                         end)
                         task.wait(8)
