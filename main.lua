@@ -236,6 +236,11 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Modul
         print("[AutoServe]: Serve Normal NPCs -> " .. tostring(state))
     end)
     
+    UI_Module.AddToggle(ServePage, "Serve Special Guests", function(state)
+        Serve_Module.Config.ServeSpecialGuests = state
+        print("[AutoServe]: Serve Special Guests -> " .. tostring(state))
+    end)
+    
     UI_Module.AddSectionLabel(ServePage, "NORMAL NPC FISH SELECTION")
     
     -- Sashimi Fish Dropdown
@@ -295,11 +300,6 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Modul
         sashimiFishDropdown.Refresh(availableFish)
         nigiriFishDropdown.Refresh(availableFish)
         sushiFishDropdown.Refresh(availableFish)
-    end)
-    
-    UI_Module.AddToggle(ServePage, "Serve Special Guests", function(state)
-        Serve_Module.Config.ServeSpecialGuests = state
-        print("[AutoServe]: Serve Special Guests -> " .. tostring(state))
     end)
     
     UI_Module.AddSectionLabel(ServePage, "VIP TARGETING")
