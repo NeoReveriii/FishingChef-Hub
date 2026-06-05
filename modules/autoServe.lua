@@ -389,13 +389,9 @@ local function GetLanternAnchor()
     return nil
 end
 
--- Phase 1: Radar, Position Detection & Recycling (Fully Filtered)
-local function Phase1_RadarDetection(OpenPlot)
+-- Phase 1: Radar, Position Detection (Spam Removed)
+local function Phase1_RadarDetection()
     local Workspace = game:GetService("Workspace")
-    
-    pcall(function()
-        OpenPlot:FireServer(true)
-    end)
     
     local codeFolder = Workspace:FindFirstChild("Code")
     if not codeFolder then return nil, nil end
@@ -632,7 +628,7 @@ function AutoServe.Start()
     if loopThread then task.cancel(loopThread) end
     AutoServe.Enabled = true
     
-    print("[AutoServe]: Started Main Loop with Non-Blocking Position Validations.")
+    print("[AutoServe]: Started Main Loop with Compliant Non-Spam Configuration.")
     
     loopThread = task.spawn(function()
         local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -643,10 +639,18 @@ function AutoServe.Start()
         local EquipPlate = FishServices:WaitForChild("RE"):WaitForChild("EquipPlate")
         local RequestRestaurauntData = FishServices:WaitForChild("RF"):WaitForChild("RequestRestaurauntData")
         
+        -- FIXED: Fire OpenPlot EXACTLY ONCE upon initialization to open your restaurant.
+        -- This prevents breaking the walking paths and avoids account flagging.
+        pcall(function()
+            OpenPlot:FireServer(true)
+            debugLog("Sent initial OpenPlot initialization signal to Server.")
+        end)
+        task.wait(1.5)
+        
         while AutoServe.Enabled do
             local loopsucceeded, errorMsg = pcall(function()
-                -- Check Seats
-                local slot1, slot2 = Phase1_RadarDetection(OpenPlot)
+                -- Read positions safely (no OpenPlot inside)
+                local slot1, slot2 = Phase1_RadarDetection()
                 
                 -- Dynamic Memory Cache Cleanup: If an NPC model leaves, scrub it from memory immediately
                 for cachedNpc, _ in pairs(servedNPCsMemory) do
