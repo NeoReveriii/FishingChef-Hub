@@ -635,21 +635,22 @@ function AutoServe.Start()
             local loopsucceeded, errorMsg = pcall(function()
                 local currentTime = os.time()
                 
-                -- Cache Timeout Cleanup
-                for targetInstance, timestamp in pairs(servedNPCsMemory) do
-                    if currentTime - timestamp > 75 then
-                        servedNPCsMemory[targetInstance] = nil
-                    end
-                end
-                
                 -- Check Seats
                 local slot1, slot2 = Phase1_RadarDetection(OpenPlot)
                 
+                -- Dynamic Memory Cache Cleanup: If an NPC model leaves, scrub it from memory immediately
+                for cachedNpc, _ in pairs(servedNPCsMemory) do
+                    if not slot1 or (slot1.npc ~= cachedNpc) then
+                        if not slot2 or (slot2.npc ~= cachedNpc) then
+                            servedNPCsMemory[cachedNpc] = nil
+                        end
+                    end
+                end
+                
                 -- If completely empty, wait gracefully for spawns
                 if not slot1 and not slot2 then
-                    debugLog("Waiting 8 seconds for new batch to populate...")
-                    task.wait(8)
-                    slot1, slot2 = Phase1_RadarDetection(OpenPlot)
+                    task.wait(4)
+                    return
                 end
                 
                 local targetNPC = nil
@@ -658,51 +659,39 @@ function AutoServe.Start()
                 local targetRecipe = nil
                 local targetFish = nil
                 
-                -- Branch A: Targeted VIP Mode (Priority 1)
+                -- Check Slots Independently (Prevents Slot 1 from paralyzing Slot 2 operations)
+                local availableTargets = {}
+                if slot1 then table.insert(availableTargets, {data = slot1, id = 1}) end
+                if slot2 then table.insert(availableTargets, {data = slot2, id = 2}) end
+                
+                -- PRIORITY 1: VIP Target Scanning
                 if AutoServe.Config.ServeSpecialGuests and #AutoServe.Config.SelectedVIPs > 0 then
-                    if slot1 and slot1.identity and not servedNPCsMemory[slot1.npc] then
-                        for _, vipName in ipairs(AutoServe.Config.SelectedVIPs) do
-                            if slot1.identity:find(vipName) then
-                                targetNPC = slot1; targetSlot = 1
-                                local vipOrder = VIP_ORDERS[vipName]
-                                targetFoodName = vipOrder.displayName; targetRecipe = vipOrder.recipe; targetFish = vipOrder.fish
-                                break
+                    for _, entry in ipairs(availableTargets) do
+                        if entry.data.identity and not servedNPCsMemory[entry.data.npc] then
+                            for _, vipName in ipairs(AutoServe.Config.SelectedVIPs) do
+                                if entry.data.identity:find(vipName) then
+                                    targetNPC = entry.data; targetSlot = entry.id
+                                    local vipOrder = VIP_ORDERS[vipName]
+                                    targetFoodName = vipOrder.displayName; targetRecipe = vipOrder.recipe; targetFish = vipOrder.fish
+                                    break
+                                end
                             end
                         end
-                    end
-                    if not targetNPC and slot2 and slot2.identity and not servedNPCsMemory[slot2.npc] then
-                        for _, vipName in ipairs(AutoServe.Config.SelectedVIPs) do
-                            if slot2.identity:find(vipName) then
-                                targetNPC = slot2; targetSlot = 2
-                                local vipOrder = VIP_ORDERS[vipName]
-                                targetFoodName = vipOrder.displayName; targetRecipe = vipOrder.recipe; targetFish = vipOrder.fish
-                                break
-                            end
-                        end
+                        if targetNPC then break end
                     end
                 end
                 
-                -- Branch B: Normal Serving Mode (Priority 2 - only runs if VIP mode didn't find target)
+                -- PRIORITY 2: Normal Target Scanning (Runs if no VIP matches exist)
                 if not targetNPC and AutoServe.Config.ServeNormalNPCs then
-                    if slot1 and not servedNPCsMemory[slot1.npc] then
-                        local requestedRecipe = GetNPCRequestedRecipe(slot1.npc)
-                        if requestedRecipe and AutoServe.Config.NormalOrder[requestedRecipe] then
-                            targetNPC = slot1; targetSlot = 1
-                            targetRecipe = requestedRecipe
-                            targetFish = AutoServe.Config.NormalOrder[requestedRecipe].Fish
-                            targetFoodName = AutoServe.Config.NormalOrder[requestedRecipe].DisplayName
-                        else
-                            debugLog("[SKIP] Could not read order for Slot 1 NPC: " .. slot1.identity)
-                        end
-                    elseif slot2 and not servedNPCsMemory[slot2.npc] then
-                        local requestedRecipe = GetNPCRequestedRecipe(slot2.npc)
-                        if requestedRecipe and AutoServe.Config.NormalOrder[requestedRecipe] then
-                            targetNPC = slot2; targetSlot = 2
-                            targetRecipe = requestedRecipe
-                            targetFish = AutoServe.Config.NormalOrder[requestedRecipe].Fish
-                            targetFoodName = AutoServe.Config.NormalOrder[requestedRecipe].DisplayName
-                        else
-                            debugLog("[SKIP] Could not read order for Slot 2 NPC: " .. slot2.identity)
+                    for _, entry in ipairs(availableTargets) do
+                        if not servedNPCsMemory[entry.data.npc] then
+                            local requestedRecipe = GetNPCRequestedRecipe(entry.data.npc)
+                            if requestedRecipe and AutoServe.Config.NormalOrder[requestedRecipe] then
+                                targetNPC = entry.data; targetSlot = entry.id; targetRecipe = requestedRecipe
+                                targetFish = AutoServe.Config.NormalOrder[requestedRecipe].Fish
+                                targetFoodName = AutoServe.Config.NormalOrder[requestedRecipe].DisplayName
+                                break
+                            end
                         end
                     end
                 end
