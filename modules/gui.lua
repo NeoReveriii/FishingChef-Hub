@@ -251,18 +251,36 @@ function GUI.Create()
         Stroke.Color = Color3.fromRGB(35, 35, 35)
         Stroke.Thickness = 1
         
+        -- Search Box at the top of the dropdown
+        local SearchBox = Instance.new("TextBox", FloatingList)
+        SearchBox.Size = UDim2.new(1, -10, 0, 28)
+        SearchBox.Position = UDim2.new(0, 5, 0, 5)
+        SearchBox.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+        SearchBox.Text = ""
+        SearchBox.PlaceholderText = "Search..."
+        SearchBox.PlaceholderColor3 = Color3.fromRGB(100, 100, 100)
+        SearchBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+        SearchBox.Font = Enum.Font.GothamMedium
+        SearchBox.TextSize = 12
+        SearchBox.ClearTextOnFocus = false
+        SearchBox.ZIndex = 101
+        Instance.new("UICorner", SearchBox).CornerRadius = UDim.new(0, 4)
+        
         local ListScroll = Instance.new("ScrollingFrame", FloatingList)
-        ListScroll.Size = UDim2.new(1, 0, 1, 0)
+        ListScroll.Size = UDim2.new(1, 0, 1, -38)
+        ListScroll.Position = UDim2.new(0, 0, 0, 38)
         ListScroll.BackgroundTransparency = 1
         ListScroll.ScrollBarThickness = 4
         ListScroll.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
         ListScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+        ListScroll.ZIndex = 100
         
         local listLayout = Instance.new("UIListLayout", ListScroll)
         listLayout.Padding = UDim.new(0, 2)
         listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
         
         local selectedItems = {}
+        local originalOptions = listOptions
         
         local function UpdateMainText()
             if not multiSelect then return end
@@ -324,6 +342,7 @@ function GUI.Create()
                     else
                         MainBtn.Text = "   " .. tostring(option) .. "   ▼"
                         FloatingList.Visible = false
+                        SearchBox.Text = ""
                         if callback then callback(option) end
                     end
                 end)
@@ -332,6 +351,22 @@ function GUI.Create()
             -- Adjust canvas size for scrolling
             ListScroll.CanvasSize = UDim2.new(0, 0, 0, #options * 32)
         end
+        
+        -- Search filter functionality
+        SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
+            local searchText = string.lower(SearchBox.Text)
+            if searchText == "" then
+                populate(originalOptions)
+            else
+                local filtered = {}
+                for _, option in ipairs(originalOptions) do
+                    if string.lower(tostring(option)):find(searchText) then
+                        table.insert(filtered, option)
+                    end
+                end
+                populate(filtered)
+            end
+        end)
         
         populate(listOptions)
         
@@ -352,13 +387,16 @@ function GUI.Create()
                     if child:IsA("TextButton") then optionCount = optionCount + 1 end
                 end
                 
-                FloatingList.Size = UDim2.new(0, MainBtn.AbsoluteSize.X, 0, math.min(optionCount * 32 + 4, 150))
+                FloatingList.Size = UDim2.new(0, MainBtn.AbsoluteSize.X, 0, math.min(optionCount * 32 + 44, 194))
                 FloatingList.Visible = true
+                SearchBox.Text = ""
+                SearchBox:CaptureFocus()
                 
                 if posTracker then posTracker:Disconnect() end
                 posTracker = MainFrame:GetPropertyChangedSignal("AbsolutePosition"):Connect(syncPos)
             else
                 FloatingList.Visible = false
+                SearchBox.Text = ""
                 if posTracker then posTracker:Disconnect(); posTracker = nil end
             end
         end)
@@ -366,6 +404,7 @@ function GUI.Create()
         -- Return a table with a Refresh function
         return {
             Refresh = function(newOptions)
+                originalOptions = newOptions
                 populate(newOptions)
             end
         }
