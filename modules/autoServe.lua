@@ -712,7 +712,27 @@ function AutoServe.Start()
                     
                     if not IsNPCSeated(targetNPC.npc) then
                         debugLog("[TIMEOUT] Customer failed to seat within 8s. Checking other slot...")
-                        return
+                        -- Try to serve the other NPC if it's seated
+                        local otherSlot = (targetSlot == 1 and slot2) or slot1
+                        if otherSlot and IsNPCSeated(otherSlot.npc) and not servedNPCsMemory[otherSlot.npc] then
+                            debugLog("[FALLBACK] Serving other seated NPC: " .. otherSlot.identity)
+                            targetNPC = otherSlot
+                            targetSlot = (targetSlot == 1 and 2) or 1
+                            local requestedRecipe = GetNPCRequestedRecipe(targetNPC.npc)
+                            targetRecipe = requestedRecipe
+                            targetFish = AutoServe.Config.NormalOrder[requestedRecipe].Fish
+                            targetFoodName = AutoServe.Config.NormalOrder[requestedRecipe].DisplayName
+                            debugLog("[TARGET] " .. targetNPC.identity .. " at Slot " .. targetSlot .. " (Seated - serving " .. targetFoodName .. ")")
+                        else
+                            debugLog("[TIMEOUT] No seated NPCs available. Forcing plot recycle...")
+                            pcall(function()
+                                OpenPlot:FireServer(false)
+                                task.wait(4)
+                                OpenPlot:FireServer(true)
+                            end)
+                            task.wait(6) -- Give network/NPCs time to clear out safely
+                            return
+                        end
                     end
                     
                     -- Run fulfillment chain
