@@ -86,4 +86,19 @@ function Utilities.IsFPSBoostEnabled()
     return fpsBoostEnabled
 end
 
+local renderEnabled = true
+
+function Utilities.SetRenderEnabled(enabled)
+    local RunService = game:GetService("RunService")
+    renderEnabled = enabled
+    pcall(function()
+        RunService:Set3dRenderingEnabled(enabled)
+    end)
+    print("[Utilities]: 3D Rendering " .. (enabled and "enabled" or "disabled"))
+end
+
+function Utilities.IsRenderEnabled()
+    return renderEnabled
+end
+
 return Utilities

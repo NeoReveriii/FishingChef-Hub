@@ -89,7 +89,9 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Modul
     ClearBtn.MouseButton1Click:Connect(function()
         Logic_Module.SelectedRecipe = "Sashimi"
         Logic_Module.SelectedFishes = {}
-        dropdownController.Refresh({"Loading..."})
+        local available = Logic_Module.GetAvailableFish()
+        if #available == 0 then available = {"No Fish Found"} end
+        dropdownController.Refresh(available)
         Logic_Module.Stop()
         print("[State]: Selection cleared")
     end)
@@ -188,7 +190,11 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Modul
     
     SellClearBtn.MouseButton1Click:Connect(function()
         Sell_Module.SelectedFish = {}
-        sellDropdown.Refresh({"Loading..."})
+        Sell_Module.SelectedRarity = {}
+        local types = Sell_Module.FetchAllFishTypes()
+        if #types == 0 then types = {"(No fish found – try refreshing)"} end
+        Sell_Module.AllFishTypes = types
+        sellDropdown.Refresh(types)
         Sell_Module.Stop()
         print("[AutoSell]: Selection cleared")
     end)
@@ -346,6 +352,10 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Modul
         else
             print("[Utilities]: FPS Boost already enabled (requires game restart to disable)")
         end
+    end)
+    
+    UI_Module.AddToggle(UtilsPage, "White Screen (On/Off Render)", function(state)
+        Util_Module.SetRenderEnabled(not state)
     end)
     
     UI_Module.AddSectionLabel(UtilsPage, "ANTI-AFK")
