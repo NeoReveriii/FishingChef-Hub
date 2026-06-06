@@ -358,28 +358,26 @@ local function Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, ta
     local backpack = LocalPlayer:WaitForChild("Backpack")
     local humanoid = character:WaitForChild("Humanoid")
     
-    debugLog("[INVENTORY] Searching for: " .. targetFoodName .. " (Recipe: " .. targetRecipe .. ", Fish: " .. tostring(targetFish) .. ")")
-    
     local lowerRecipeTarget = string.lower(targetRecipe or "")
     local lowerFishTarget = string.gsub(string.lower(targetFish or ""), "_", " ")
 
-    -- FIX 1: Enhanced Broad Hotbar/Backpack Scanner
+    -- STRICT FIX: Ensures BOTH the fish type AND the preparation method match exactly
     local function tryEquipFoodTool()
-        -- Look inside character hands first
+        -- Scan Active Hand
         for _, tool in ipairs(character:GetChildren()) do
             if tool:IsA("Tool") then
                 local tName = string.lower(tool.Name)
-                if tName:find("filet") or tName:find(lowerRecipeTarget) or tName:find(lowerFishTarget) then
+                if tName:find("filet") or (tName:find(lowerFishTarget) and tName:find(lowerRecipeTarget)) then
                     return true, tool.Name
                 end
             end
         end
-        -- Look inside the hotbar/backpack slots
+        -- Scan Hotbar/Backpack Slots
         for _, tool in ipairs(backpack:GetChildren()) do
             if tool:IsA("Tool") then
                 local tName = string.lower(tool.Name)
-                if tName:find("filet") or tName:find(lowerRecipeTarget) or tName:find(lowerFishTarget) then
-                    debugLog("[HOTBAR] Found and equipping item matching customer criteria: " .. tool.Name)
+                if tName:find("filet") or (tName:find(lowerFishTarget) and tName:find(lowerRecipeTarget)) then
+                    debugLog("[HOTBAR] Found exact matching item: " .. tool.Name)
                     humanoid:EquipTool(tool)
                     task.wait(0.3)
                     return true, tool.Name
@@ -389,87 +387,72 @@ local function Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, ta
         return false, nil
     end
     
-    -- Fast pre-check: If you are already holding it, serve it instantly
+    -- Pre-check: If you are already holding the correct combo, serve it immediately
     local alreadyHolding, existingToolName = tryEquipFoodTool()
     if alreadyHolding then
         ServeFood(targetNPC.npc, existingToolName, targetSlot)
         return true
     end
     
-    -- Fetch storage cabinet items from the server
+    -- Fetch storage cabinet data
     local success, restaurantData = pcall(function() return RequestRestaurauntData:InvokeServer() end)
     if success and restaurantData then
-        debugLog("[STORAGE] Checking storage for: " .. targetFoodName .. " (Recipe: " .. targetRecipe .. ", Fish: " .. tostring(targetFish) .. ")")
-        debugLog("[STORAGE] Target fish (lower): " .. tostring(lowerFishTarget))
-        local dishCount = 0
         for itemID, foodItem in pairs(restaurantData) do
             if type(foodItem) == "table" and foodItem.CF then
                 local internalFishName = string.gsub(string.lower(foodItem.CF), "_", " ")
                 local amountValue = tonumber(foodItem.Amount) or 0
-                dishCount = dishCount + 1
                 
-                debugLog("[STORAGE] Item " .. tostring(itemID) .. ": CF=" .. foodItem.CF .. " (lower: " .. internalFishName .. "), Amount=" .. amountValue .. ", Match=" .. tostring(internalFishName == lowerFishTarget))
-                
-                -- Verify if this slot holds the target fish variety and has stock available
+                -- Verify cabinet item against fish criteria
                 if internalFishName == lowerFishTarget and amountValue > 0 then
-                    debugLog("[STORAGE] MATCH FOUND! Internal ID: " .. tostring(itemID) .. " | Variety: " .. internalFishName)
+                    debugLog("[STORAGE] Found " .. foodItem.CF .. " in cabinet")
                     
-                    -- Fire remote payload matching manual Remote Spy syntax
+                    -- Form payload using strict network patterns from Remote Spy logs
+                    local equipPayload = {
+                        CF = foodItem.CF,
+                        Name = targetRecipe, -- Sends exact requested text: "Sushi", "Sashimi", or "Nigiri"
+                        Amount = 1,
+                        ID = foodItem.ID or itemID, -- Uses server "PXX" tracking keys
+                        Data = foodItem.Data or 0,
+                        Value = foodItem.Value or 0
+                    }
+                    
                     pcall(function()
-                        EquipPlate:FireServer({
-                            CF = foodItem.CF,
-                            Name = targetRecipe, 
-                            Amount = 1,
-                            ID = itemID,
-                            Data = foodItem.Data or 0,
-                            Value = foodItem.Value or 0
-                        })
+                        EquipPlate:FireServer(equipPayload)
                     end)
                     
-                    -- Server replication allowance delay
                     task.wait(0.6)
                     
-                    -- Look for the newly generated item inside your hotbar/backpack
+                    -- Look for the precise tool in inventory
                     local toolFound, physicalToolName = tryEquipFoodTool()
                     if toolFound then
-                        debugLog("[INVENTORY] Tool equipped after storage pull: " .. physicalToolName)
                         ServeFood(targetNPC.npc, physicalToolName, targetSlot)
                     else
-                        debugLog("[INVENTORY] Warning: Tool replication slow. Forcing direct fallback handoff.")
-                        -- Fallback assignment if replication lag occurs but we know the server accepted it
+                        debugLog("[INVENTORY] Tool replication slow, using fallback")
                         ServeFood(targetNPC.npc, targetRecipe, targetSlot)
                     end
                     
-                    -- FIX 2: EXITS FUNCTION INSTANTLY - Cuts off ghost loops from ever triggering autocook
-                    return true 
+                    return true -- Breaks execution immediately to avoid ghost cook triggers
                 end
             end
         end
-        debugLog("[STORAGE] Checked " .. dishCount .. " items. No match found for fish: " .. tostring(lowerFishTarget))
-    else
-        debugLog("[INVENTORY] Failed to fetch restaurant storage data")
     end
     
     -- Fallback Operation: Trigger cooking sequence ONLY if storage contains 0 plates
     if targetFish and AutoCookModule then
-        debugLog("[INVENTORY] Targeted item out of stock. Prompting AutoCook module for: " .. targetRecipe .. " (" .. targetFish .. ")")
+        debugLog("[COOK] Cooking " .. targetRecipe .. " with " .. targetFish)
         local cookSuccess = pcall(function() return AutoCookModule.CookSingle(targetRecipe, targetFish) end)
         if cookSuccess then
-            debugLog("[INVENTORY] Cook successful, waiting for dish to appear...")
             task.wait(2.2)
             local toolFound, physicalToolName = tryEquipFoodTool()
             if toolFound then
-                debugLog("[INVENTORY] Cooked dish found: " .. physicalToolName)
                 ServeFood(targetNPC.npc, physicalToolName, targetSlot)
                 return true
             else
-                debugLog("[INVENTORY] Cooked dish not found after cooking")
+                debugLog("[COOK] Dish not found after cooking")
             end
         else
-            debugLog("[INVENTORY] Auto-cook failed for: " .. targetRecipe .. " with " .. targetFish)
+            debugLog("[COOK] Failed to cook " .. targetRecipe .. " with " .. targetFish)
         end
-    else
-        debugLog("[INVENTORY] No AutoCookModule or targetFish provided")
     end
     
     return false
@@ -532,13 +515,10 @@ function AutoServe.Start()
                 
                 -- PRIORITY 1: VIP Target Scanning
                 if AutoServe.Config.ServeSpecialGuests and #AutoServe.Config.SelectedVIPs > 0 then
-                    debugLog("[VIP SCANNING] Checking for VIPs: " .. table.concat(AutoServe.Config.SelectedVIPs, ", "))
                     for _, entry in ipairs(availableTargets) do
                         if entry.data.identity and not servedNPCsMemory[entry.data.npc] then
-                            debugLog("[VIP SCANNING] Found NPC: " .. entry.data.identity .. " at Slot " .. entry.id)
                             -- NON-BLOCKING CONDITION: Only target if they have safely arrived at their objective position
                             if IsNPCSeated(entry.data.npc) or IsAtCounter(entry.data.npc) then
-                                debugLog("[VIP SCANNING] NPC is ready (seated/at counter)")
                                 for _, vipName in ipairs(AutoServe.Config.SelectedVIPs) do
                                     if entry.data.identity:find(vipName) then
                                         targetNPC = entry.data; targetSlot = entry.id
@@ -548,57 +528,35 @@ function AutoServe.Start()
                                         if vipName == "Rich Guy" then
                                             targetFish = AutoServe.Config.RichGuyFish
                                             targetFoodName = AutoServe.Config.RichGuyFish .. " Nigiri"
-                                            debugLog("[VIP SCANNING] Targeting Rich Guy with fish: " .. targetFish)
                                         else
                                             targetFish = vipOrder.fish
-                                            debugLog("[VIP SCANNING] Targeting " .. vipName .. " with fish: " .. targetFish)
                                         end
+                                        debugLog("[VIP] Targeting " .. vipName .. " with " .. targetFoodName)
                                         break
                                     end
                                 end
-                            else
-                                debugLog("[VIP SCANNING] NPC not ready yet (walking)")
-                            end
-                        else
-                            if entry.data.identity then
-                                debugLog("[VIP SCANNING] NPC " .. entry.data.identity .. " already served, skipping")
                             end
                         end
                         if targetNPC then break end
-                    end
-                    if not targetNPC then
-                        debugLog("[VIP SCANNING] No VIP targets found this cycle")
                     end
                 end
                 
                 -- PRIORITY 2: Normal Target Scanning (Runs if no VIP matches exist)
                 if not targetNPC and AutoServe.Config.ServeNormalNPCs then
-                    debugLog("[NORMAL SCANNING] Checking for normal NPCs")
                     for _, entry in ipairs(availableTargets) do
                         if not servedNPCsMemory[entry.data.npc] then
-                            debugLog("[NORMAL SCANNING] Found NPC at Slot " .. entry.id .. ": " .. entry.data.identity)
                             -- NON-BLOCKING CONDITION: Skip walking customers instantly to evaluate other slots
                             if IsNPCSeated(entry.data.npc) or IsAtCounter(entry.data.npc) then
                                 local requestedRecipe = GetNPCRequestedRecipe(entry.data.npc)
-                                debugLog("[NORMAL SCANNING] NPC requested recipe: " .. tostring(requestedRecipe))
                                 if requestedRecipe and AutoServe.Config.NormalOrder[requestedRecipe] then
                                     targetNPC = entry.data; targetSlot = entry.id; targetRecipe = requestedRecipe
                                     targetFish = AutoServe.Config.NormalOrder[requestedRecipe].Fish
                                     targetFoodName = AutoServe.Config.NormalOrder[requestedRecipe].DisplayName
-                                    debugLog("[NORMAL SCANNING] Targeting NPC with " .. targetFoodName .. " (Fish: " .. targetFish .. ")")
+                                    debugLog("[NORMAL] Targeting NPC with " .. targetFoodName)
                                     break
-                                else
-                                    debugLog("[NORMAL SCANNING] Recipe not found in config: " .. tostring(requestedRecipe))
                                 end
-                            else
-                                debugLog("[NORMAL SCANNING] NPC not ready yet (walking)")
                             end
-                        else
-                            debugLog("[NORMAL SCANNING] NPC at Slot " .. entry.id .. " already served, skipping")
                         end
-                    end
-                    if not targetNPC then
-                        debugLog("[NORMAL SCANNING] No normal NPC targets found this cycle")
                     end
                 end
                 
