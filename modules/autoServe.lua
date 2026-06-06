@@ -420,14 +420,37 @@ local function Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, ta
                         EquipPlate:FireServer(equipPayload)
                     end)
                     
-                    task.wait(0.6)
+                    task.wait(1.0)
                     
-                    -- Look for the precise tool in inventory
+                    -- Look for the precise tool in inventory with retry logic
                     local toolFound, physicalToolName = tryEquipFoodTool()
+                    local retryCount = 0
+                    while not toolFound and retryCount < 3 do
+                        retryCount = retryCount + 1
+                        debugLog("[INVENTORY] Retry " .. retryCount .. "/3: Tool not found, waiting 0.5s...")
+                        task.wait(0.5)
+                        toolFound, physicalToolName = tryEquipFoodTool()
+                    end
+                    
                     if toolFound then
                         ServeFood(targetNPC.npc, physicalToolName, targetSlot)
                     else
-                        debugLog("[INVENTORY] Tool replication slow, using fallback")
+                        -- Loosen matching for fallback - accept tools matching fish OR recipe
+                        debugLog("[INVENTORY] Strict match failed, trying loose match...")
+                        for _, tool in ipairs(backpack:GetChildren()) do
+                            if tool:IsA("Tool") then
+                                local tName = string.lower(tool.Name)
+                                if tName:find(lowerFishTarget) or tName:find(lowerRecipeTarget) then
+                                    debugLog("[INVENTORY] Found with loose match: " .. tool.Name)
+                                    humanoid:EquipTool(tool)
+                                    task.wait(0.3)
+                                    ServeFood(targetNPC.npc, tool.Name, targetSlot)
+                                    return true
+                                end
+                            end
+                        end
+                        -- Final fallback
+                        debugLog("[INVENTORY] Tool not found in backpack, using fallback")
                         ServeFood(targetNPC.npc, targetRecipe, targetSlot)
                     end
                     
