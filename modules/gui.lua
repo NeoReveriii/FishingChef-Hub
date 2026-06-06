@@ -56,7 +56,7 @@ function GUI.Create()
     local AppTitle = Instance.new("TextLabel", Sidebar)
     AppTitle.Size = UDim2.new(1, 0, 0, 45)
     AppTitle.BackgroundTransparency = 1
-    AppTitle.Text = "   Kilabot Hub v.8"
+    AppTitle.Text = "   Kilabot Hub v.8a"
     AppTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
     AppTitle.Font = Enum.Font.GothamBold
     AppTitle.TextSize = 14
@@ -101,6 +101,12 @@ function GUI.Create()
     Instance.new("UICorner", MinimizeButton).CornerRadius = UDim.new(0, 6)
     
     MinimizeButton.MouseButton1Click:Connect(function()
+        -- Close all open dropdowns when minimizing
+        for _, dropdown in ipairs(allFloatingDropdowns) do
+            if dropdown and dropdown.Parent then
+                dropdown.Visible = false
+            end
+        end
         MainFrame.Visible = false
         MaximizeAnchor.Visible = true
     end)
@@ -376,6 +382,13 @@ function GUI.Create()
         MainBtn.MouseButton1Click:Connect(function()
             open = not open
             if open then
+                -- Close all other dropdowns before opening this one
+                for _, dropdown in ipairs(allFloatingDropdowns) do
+                    if dropdown and dropdown.Parent and dropdown ~= FloatingList then
+                        dropdown.Visible = false
+                    end
+                end
+                
                 local function syncPos()
                     local btnAbsolutePos = MainBtn.AbsolutePosition
                     FloatingList.Position = UDim2.new(0, btnAbsolutePos.X, 0, btnAbsolutePos.Y + MainBtn.AbsoluteSize.Y + 4)
@@ -493,6 +506,13 @@ function GUI.Create()
         MainBtn.MouseButton1Click:Connect(function()
             open = not open
             if open then
+                -- Close all other dropdowns before opening this one
+                for _, dropdown in ipairs(allFloatingDropdowns) do
+                    if dropdown and dropdown.Parent and dropdown ~= FloatingList then
+                        dropdown.Visible = false
+                    end
+                end
+                
                 local function syncPos()
                     local btnAbsolutePos = MainBtn.AbsolutePosition
                     FloatingList.Position = UDim2.new(0, btnAbsolutePos.X, 0, btnAbsolutePos.Y + MainBtn.AbsoluteSize.Y + 4)
