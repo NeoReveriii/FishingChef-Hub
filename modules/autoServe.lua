@@ -13,6 +13,7 @@ AutoServe.Config = {
     ServeNormalNPCs = true,
     ServeSpecialGuests = false,
     SelectedVIPs = {}, -- Array of selected VIP names
+    RichGuyFish = "salmon", -- Dynamic fish selection for Rich Guy (accepts any fish)
     
     -- Normal NPC Order Configuration - separate fish for each recipe
     NormalOrder = {
@@ -586,7 +587,14 @@ function AutoServe.Start()
                                     if entry.data.identity:find(vipName) then
                                         targetNPC = entry.data; targetSlot = entry.id
                                         local vipOrder = VIP_ORDERS[vipName]
-                                        targetFoodName = vipOrder.displayName; targetRecipe = vipOrder.recipe; targetFish = vipOrder.fish
+                                        targetFoodName = vipOrder.displayName; targetRecipe = vipOrder.recipe
+                                        -- Use dynamic fish for Rich Guy, hardcoded for other VIPs
+                                        if vipName == "Rich Guy" then
+                                            targetFish = AutoServe.Config.RichGuyFish
+                                            targetFoodName = AutoServe.Config.RichGuyFish .. " Nigiri"
+                                        else
+                                            targetFish = vipOrder.fish
+                                        end
                                         break
                                     end
                                 end

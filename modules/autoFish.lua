@@ -95,7 +95,7 @@ function AutoFish.Stop()
         loopThread = nil
     end
     
-    -- Attempt to fix invisible hotbar by unequipping rod and re-enabling CoreGui Backpack
+    -- Unequip tools when stopping
     pcall(function()
         local LocalPlayer = game:GetService("Players").LocalPlayer
         local char = LocalPlayer.Character
@@ -103,7 +103,6 @@ function AutoFish.Stop()
             local humanoid = char:FindFirstChild("Humanoid")
             if humanoid then humanoid:UnequipTools() end
         end
-        game:GetService("StarterGui"):SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, true)
     end)
     
     print("[AutoFish]: Thread terminated.")

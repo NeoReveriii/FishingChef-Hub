@@ -303,6 +303,7 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Modul
             sashimiFishDropdown.Refresh(availableFish)
             nigiriFishDropdown.Refresh(availableFish)
             sushiFishDropdown.Refresh(availableFish)
+            richGuyFishDropdown.Refresh(availableFish)
             RefreshFishBtn.Text = "Refresh Fish Lists"
             print("[AutoServe]: Fish lists updated with " .. #availableFish .. " types.")
         end)
@@ -318,6 +319,7 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Modul
         sashimiFishDropdown.Refresh(availableFish)
         nigiriFishDropdown.Refresh(availableFish)
         sushiFishDropdown.Refresh(availableFish)
+        richGuyFishDropdown.Refresh(availableFish)
     end)
     
     UI_Module.AddSectionLabel(ServePage, "VIP TARGETING")
@@ -325,6 +327,12 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Modul
     UI_Module.AddDropdown(ServePage, "Select VIPs to Target", {"Rich Guy", "Ninja", "Food Critic", "Sushi Chef"}, true, function(choices)
         Serve_Module.Config.SelectedVIPs = choices
         print("[AutoServe]: Targeting VIPs -> " .. table.concat(choices, ", "))
+    end)
+    
+    -- Rich Guy Fish Dropdown (dynamic - accepts any fish)
+    local richGuyFishDropdown = UI_Module.AddDropdown(ServePage, "Rich Guy Fish (Nigiri)", {"Loading..."}, false, function(choice)
+        Serve_Module.Config.RichGuyFish = choice
+        print("[AutoServe]: Rich Guy Fish -> " .. choice)
     end)
     
     -- Pass AutoCook module to AutoServe for cooking integration
