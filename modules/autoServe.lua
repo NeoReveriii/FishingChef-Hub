@@ -398,13 +398,14 @@ local function Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, ta
     local success, restaurantData = pcall(function() return RequestRestaurauntData:InvokeServer() end)
     if success and restaurantData then
         for itemID, foodItem in pairs(restaurantData) do
-            if type(foodItem) == "table" and foodItem.CF then
+            if type(foodItem) == "table" and foodItem.CF and foodItem.Name then
                 local internalFishName = string.gsub(string.lower(foodItem.CF), "_", " ")
+                local internalRecipeName = string.gsub(string.lower(foodItem.Name), "_", " ")
                 local amountValue = tonumber(foodItem.Amount) or 0
                 
-                -- Verify cabinet item against fish criteria
-                if internalFishName == lowerFishTarget and amountValue > 0 then
-                    debugLog("[STORAGE] Found " .. foodItem.CF .. " in cabinet")
+                -- Verify cabinet item matches BOTH fish species AND recipe type
+                if internalFishName == lowerFishTarget and internalRecipeName == lowerRecipeTarget and amountValue > 0 then
+                    debugLog("[STORAGE] Found " .. foodItem.CF .. " " .. foodItem.Name .. " in cabinet")
                     
                     -- Form payload using strict network patterns from Remote Spy logs
                     local equipPayload = {
