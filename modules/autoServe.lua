@@ -358,167 +358,105 @@ local function Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, ta
     local backpack = LocalPlayer:WaitForChild("Backpack")
     local humanoid = character:WaitForChild("Humanoid")
     
+    local lowerFishTarget = string.gsub(string.lower(targetFish or ""), "_", " ")
+    local lowerRecipeTarget = string.lower(targetRecipe or "")
+    
     debugLog("[INVENTORY] Searching for: " .. targetFoodName .. " (Recipe: " .. targetRecipe .. ", Fish: " .. tostring(targetFish) .. ")")
     
-    -- Convert tracking strings to lowercase and remove underscores for matching
-    local lowerFoodName = string.gsub(string.lower(targetFoodName), "_", " ")
-    local lowerRecipe = string.lower(targetRecipe)
-    local lowerFish = string.gsub(string.lower(targetFish or ""), "_", " ")
-
-    local function safeEquipTool(tool)
-        local equippedCount = 0
-        for _, child in ipairs(character:GetChildren()) do
-            if child:IsA("Tool") then equippedCount = equippedCount + 1 end
-        end
-        
-        if equippedCount >= 6 then
-            for _, child in ipairs(character:GetChildren()) do
-                if child:IsA("Tool") and string.lower(child.Name) ~= lowerFoodName then
-                    humanoid:UnequipTools(child)
-                    task.wait(0.1)
-                    break
-                end
+    -- Helper function to find and equip ANY food plate or filet tool in inventory
+    local function tryEquipFoodTool()
+        -- Scan character space first
+        for _, tool in ipairs(character:GetChildren()) do
+            if tool:IsA("Tool") and (string.find(string.lower(tool.Name), "filet") or string.find(string.lower(tool.Name), lowerRecipeTarget)) then
+                return true, tool.Name
             end
         end
-        humanoid:EquipTool(tool)
-        task.wait(0.2)
-    end
-    
-    -- Check Hotbar (Backpack)
-    local backpackTools = {}
-    for _, tool in ipairs(backpack:GetChildren()) do
-        local toolNameLower = string.gsub(string.lower(tool.Name), "_", " ")
-        table.insert(backpackTools, tool.Name)
-        -- Check for exact match first
-        if toolNameLower == lowerFoodName then
-            debugLog("[INVENTORY] Found in backpack: " .. tool.Name)
-            safeEquipTool(tool)
-            ServeFood(targetNPC.npc, tool.Name, targetSlot)
-            return true
-        end
-        -- Check for partial match (case-insensitive, underscore-insensitive)
-        if toolNameLower:find(lowerRecipe) and toolNameLower:find(lowerFish) then
-            debugLog("[INVENTORY] Found partial match in backpack: " .. tool.Name .. " (Target: " .. targetFoodName .. ")")
-            safeEquipTool(tool)
-            ServeFood(targetNPC.npc, tool.Name, targetSlot)
-            return true
-        end
-    end
-    
-    for _, tool in ipairs(character:GetChildren()) do
-        if tool:IsA("Tool") then
-            local toolNameLower = string.gsub(string.lower(tool.Name), "_", " ")
-            if toolNameLower == lowerFoodName then
-                debugLog("[INVENTORY] Found on character: " .. tool.Name)
-                ServeFood(targetNPC.npc, tool.Name, targetSlot)
-                return true
-            end
-            -- Check for partial match (case-insensitive, underscore-insensitive)
-            if toolNameLower:find(lowerRecipe) and toolNameLower:find(lowerFish) then
-                debugLog("[INVENTORY] Found partial match on character: " .. tool.Name .. " (Target: " .. targetFoodName .. ")")
-                ServeFood(targetNPC.npc, tool.Name, targetSlot)
-                return true
+        -- Scan backpack storage
+        for _, tool in ipairs(backpack:GetChildren()) do
+            if tool:IsA("Tool") and (string.find(string.lower(tool.Name), "filet") or string.find(string.lower(tool.Name), lowerRecipeTarget)) then
+                humanoid:EquipTool(tool)
+                task.wait(0.3)
+                return true, tool.Name
             end
         end
+        return false, nil
     end
     
-    -- FIXED STORAGE CHECK: Check for "Fish Filet" and match using .CF property for actual fish species
+    -- Check if we are already holding an appropriate item
+    local alreadyHolding, existingToolName = tryEquipFoodTool()
+    if alreadyHolding then
+        debugLog("[INVENTORY] Already holding: " .. existingToolName)
+        ServeFood(targetNPC.npc, existingToolName, targetSlot)
+        return true
+    end
+    
+    -- Fetch storage cabinet items from the server
     local success, restaurantData = pcall(function() return RequestRestaurauntData:InvokeServer() end)
-    if not success then
-        debugLog("[INVENTORY] Failed to fetch restaurant storage data (network error)")
-    elseif not restaurantData then
-        debugLog("[INVENTORY] Restaurant data returned nil")
-    else
+    if success and restaurantData then
         debugLog("[STORAGE] Checking storage for: " .. targetFoodName .. " (Recipe: " .. targetRecipe .. ", Fish: " .. tostring(targetFish) .. ")")
-        debugLog("[STORAGE] Target fish (lower): " .. tostring(lowerFish))
+        debugLog("[STORAGE] Target fish (lower): " .. tostring(lowerFishTarget))
         local dishCount = 0
-        local fishFiletCount = 0
         for itemID, foodItem in pairs(restaurantData) do
-            -- 1. Ensure the item is a valid kitchen item table named "Fish Filet"
-            if type(foodItem) == "table" and foodItem.Name == "Fish Filet" and foodItem.CF then
-                fishFiletCount = fishFiletCount + 1
-                dishCount = dishCount + 1
-                -- 2. Read the hidden fish species tag out of the CF property
+            if type(foodItem) == "table" and foodItem.CF then
                 local internalFishName = string.gsub(string.lower(foodItem.CF), "_", " ")
                 local amountValue = tonumber(foodItem.Amount) or 0
+                dishCount = dishCount + 1
                 
-                debugLog("[STORAGE] Item " .. tostring(itemID) .. ": CF=" .. foodItem.CF .. " (lower: " .. internalFishName .. "), Amount=" .. amountValue .. ", Match=" .. tostring(internalFishName == lowerFish))
+                debugLog("[STORAGE] Item " .. tostring(itemID) .. ": CF=" .. foodItem.CF .. " (lower: " .. internalFishName .. "), Amount=" .. amountValue .. ", Match=" .. tostring(internalFishName == lowerFishTarget))
                 
-                -- 3. Check if this specific slot matches the fish variety the customer wants
-                if internalFishName == lowerFish and amountValue > 0 then
-                    debugLog("[STORAGE] MATCH FOUND! " .. foodItem.Name .. " (" .. foodItem.CF .. ") inside Cabinet. ID: " .. tostring(itemID) .. ", Amount: " .. amountValue)
+                -- Verify if this slot holds the target fish variety and has stock available
+                if internalFishName == lowerFishTarget and amountValue > 0 then
+                    debugLog("[STORAGE] MATCH FOUND! Internal ID: " .. tostring(itemID) .. " | Variety: " .. internalFishName)
+                    
+                    -- FIXED REMOTE CALL: Formatted exactly like Remote Spy data profile!
+                    local equipPayload = {
+                        CF = foodItem.CF,
+                        Name = targetRecipe, -- Synchronizes string key to expected type (e.g. "Sashimi", "Nigiri")
+                        Amount = 1,
+                        ID = itemID, -- Uses server row ID directly
+                        Data = foodItem.Data or 0,
+                        Value = foodItem.Value or 0
+                    }
                     
                     pcall(function()
-                        EquipPlate:FireServer({
-                            CF = foodItem.CF,
-                            Name = foodItem.Name,
-                            Amount = 1,
-                            ID = tonumber(itemID) or foodItem.ID,
-                            Data = foodItem.Data or {},
-                            Value = foodItem.Value or 0
-                        })
+                        EquipPlate:FireServer(equipPayload)
                     end)
-                    task.wait(0.4)
-                    -- 4. Hand over the tool (it will always be physically named "Fish Filet")
-                    ServeFood(targetNPC.npc, "Fish Filet", targetSlot)
-                    return true
+                    
+                    -- Post-equip delay to allow the server time to replicate the physical tool asset
+                    task.wait(0.5)
+                    
+                    -- Look for the fresh tool in inventory slots
+                    local toolFound, physicalToolName = tryEquipFoodTool()
+                    if toolFound then
+                        debugLog("[INVENTORY] Tool equipped after storage pull: " .. physicalToolName)
+                        ServeFood(targetNPC.npc, physicalToolName, targetSlot)
+                        return true
+                    else
+                        debugLog("[INVENTORY] Server accepted EquipPlate payload but no physical tool was found in Backpack slots!")
+                    end
                 end
             end
         end
-        debugLog("[STORAGE] Checked " .. dishCount .. " total items, " .. fishFiletCount .. " Fish Filet items. No match found for fish: " .. tostring(lowerFish))
+        debugLog("[STORAGE] Checked " .. dishCount .. " items. No match found for fish: " .. tostring(lowerFishTarget))
+    else
+        debugLog("[INVENTORY] Failed to fetch restaurant storage data")
     end
     
-    -- Auto Cook Execution
+    -- Fallback Operation: Trigger cooking sequence if storage contains 0 plates
     if targetFish and AutoCookModule then
-        debugLog("[INVENTORY] Not found, attempting to cook: " .. targetRecipe .. " with " .. targetFish)
+        debugLog("[INVENTORY] Targeted item out of stock. Prompting AutoCook module for: " .. targetRecipe .. " (" .. targetFish .. ")")
         local cookSuccess = pcall(function() return AutoCookModule.CookSingle(targetRecipe, targetFish) end)
         if cookSuccess then
             debugLog("[INVENTORY] Cook successful, waiting for dish to appear...")
-            task.wait(2) -- Increased wait time for dish to appear
-            
-            -- Re-check backpack with detailed logging
-            local newBackpackTools = {}
-            for _, tool in ipairs(backpack:GetChildren()) do
-                local toolNameLower = string.gsub(string.lower(tool.Name), "_", " ")
-                table.insert(newBackpackTools, tool.Name)
-                -- Check for exact match
-                if toolNameLower == lowerFoodName then
-                    debugLog("[INVENTORY] Cooked dish found in backpack: " .. tool.Name)
-                    safeEquipTool(tool)
-                    ServeFood(targetNPC.npc, tool.Name, targetSlot)
-                    return true
-                end
-                -- Check for partial match (case-insensitive, underscore-insensitive)
-                if toolNameLower:find(lowerRecipe) and toolNameLower:find(lowerFish) then
-                    debugLog("[INVENTORY] Cooked dish found (partial match): " .. tool.Name)
-                    safeEquipTool(tool)
-                    ServeFood(targetNPC.npc, tool.Name, targetSlot)
-                    return true
-                end
+            task.wait(2.2)
+            local toolFound, physicalToolName = tryEquipFoodTool()
+            if toolFound then
+                debugLog("[INVENTORY] Cooked dish found: " .. physicalToolName)
+                ServeFood(targetNPC.npc, physicalToolName, targetSlot)
+                return true
+            else
+                debugLog("[INVENTORY] Cooked dish not found after cooking")
             end
-            debugLog("[INVENTORY] Backpack after cooking: " .. table.concat(newBackpackTools, ", "))
-            
-            -- Check character as well
-            local charTools = {}
-            for _, tool in ipairs(character:GetChildren()) do
-                if tool:IsA("Tool") then
-                    local toolNameLower = string.gsub(string.lower(tool.Name), "_", " ")
-                    table.insert(charTools, tool.Name)
-                    if toolNameLower == lowerFoodName then
-                        debugLog("[INVENTORY] Cooked dish found on character: " .. tool.Name)
-                        ServeFood(targetNPC.npc, tool.Name, targetSlot)
-                        return true
-                    end
-                    if toolNameLower:find(lowerRecipe) and toolNameLower:find(lowerFish) then
-                        debugLog("[INVENTORY] Cooked dish found on character (partial): " .. tool.Name)
-                        ServeFood(targetNPC.npc, tool.Name, targetSlot)
-                        return true
-                    end
-                end
-            end
-            debugLog("[INVENTORY] Character tools after cooking: " .. table.concat(charTools, ", "))
-            
-            debugLog("[INVENTORY] Cooked dish not found after cooking. Target: " .. targetFoodName)
         else
             debugLog("[INVENTORY] Auto-cook failed for: " .. targetRecipe .. " with " .. targetFish)
         end
