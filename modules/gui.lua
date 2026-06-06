@@ -90,6 +90,10 @@ function GUI.Create()
     ExitButton.TextSize = 18
     Instance.new("UICorner", ExitButton).CornerRadius = UDim.new(0, 6)
 
+    local CurrentActiveTab = nil
+    local OnTerminateCallback = nil
+    local allFloatingDropdowns = {}
+    
     local MinimizeButton = Instance.new("TextButton", MainFrame)
     MinimizeButton.Size = UDim2.new(0, 24, 0, 24)
     MinimizeButton.Position = UDim2.new(1, -64, 0, 10)
@@ -110,10 +114,6 @@ function GUI.Create()
         MainFrame.Visible = false
         MaximizeAnchor.Visible = true
     end)
-
-    local CurrentActiveTab = nil
-    local OnTerminateCallback = nil
-    local allFloatingDropdowns = {}
     
     ExitButton.MouseButton1Click:Connect(function()
         if OnTerminateCallback then OnTerminateCallback() end
