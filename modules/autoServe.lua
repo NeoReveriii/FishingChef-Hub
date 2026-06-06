@@ -103,7 +103,7 @@ local function FetchAvailableFish()
 end
 
 -- Serve Food Wrapper Function
-local function ServeFood(npcInstance, foodName, targetSeatSlot)
+local function ServeFood(npcInstance, recipeName, fishName, targetSeatSlot)
     local ReplicatedStorage = game:GetService("ReplicatedStorage")
     local StoreFood = ReplicatedStorage.Packages.Knit.Services.Fish.RE.StoreFood
     
@@ -112,39 +112,49 @@ local function ServeFood(npcInstance, foodName, targetSeatSlot)
     local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
     local humanoid = character:FindFirstChild("Humanoid")
     
+    local lowerRecipe = string.lower(recipeName or "")
+    local lowerFish = string.gsub(string.lower(fishName or ""), "_", " ")
+    
     if humanoid then
-        -- Check if food tool is already equipped
         local foodEquipped = false
-        local foodNameLower = string.gsub(string.lower(foodName), "_", " ")
-        for _, tool in ipairs(character:GetChildren()) do
-            if tool:IsA("Tool") and string.gsub(string.lower(tool.Name), "_", " ") == foodNameLower then
-                foodEquipped = true
-                break
-            end
-        end
         
-        -- If not equipped, try to equip from backpack
-        if not foodEquipped then
-            for _, tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
-                if string.gsub(string.lower(tool.Name), "_", " ") == foodNameLower then
-                    humanoid:EquipTool(tool)
-                    task.wait(0.5) -- Extended humanlike delay
+        -- 1. Check if tool is already held in your hands
+        for _, tool in ipairs(character:GetChildren()) do
+            if tool:IsA("Tool") then
+                local tName = string.lower(tool.Name)
+                if tName:find("filet") or (tName:find(lowerFish) and tName:find(lowerRecipe)) or tName == lowerRecipe then
                     foodEquipped = true
                     break
                 end
             end
         end
         
+        -- 2. Check hotbar / backpack slots and equip it instantly
+        if not foodEquipped then
+            for _, tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
+                if tool:IsA("Tool") then
+                    local tName = string.lower(tool.Name)
+                    if tName:find("filet") or (tName:find(lowerFish) and tName:find(lowerRecipe)) or tName == lowerRecipe then
+                        debugLog("[HOTBAR] Equipping: " .. tool.Name)
+                        humanoid:EquipTool(tool)
+                        task.wait(0.4) -- Essential wait for tool weld network replication
+                        foodEquipped = true
+                        break
+                    end
+                end
+            end
+        end
+        
         if foodEquipped then
-            debugLog("Food " .. foodName .. " is equipped, serving...")
+            debugLog("Food " .. (fishName or recipeName) .. " " .. recipeName .. " is equipped, serving...")
         else
-            debugLog("Warning: Could not equip " .. foodName .. " before serving")
+            debugLog("Warning: Could not equip " .. recipeName .. " before serving")
         end
     end
     
     pcall(function()
         StoreFood:FireServer(npcInstance)
-        debugLog("Served " .. foodName .. " to NPC at Slot " .. tostring(targetSeatSlot))
+        debugLog("Served " .. (fishName or recipeName) .. " " .. recipeName .. " to NPC at Slot " .. tostring(targetSeatSlot))
     end)
 end
 
@@ -361,25 +371,23 @@ local function Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, ta
     local lowerRecipeTarget = string.lower(targetRecipe or "")
     local lowerFishTarget = string.gsub(string.lower(targetFish or ""), "_", " ")
 
-    -- STRICT FIX: Ensures BOTH the fish type AND the preparation method match exactly
+    -- STRICT TOOL SEARCH: Ensures the tool matches BOTH parameters perfectly
     local function tryEquipFoodTool()
-        -- Scan Active Hand
         for _, tool in ipairs(character:GetChildren()) do
             if tool:IsA("Tool") then
                 local tName = string.lower(tool.Name)
-                if tName:find("filet") or (tName:find(lowerFishTarget) and tName:find(lowerRecipeTarget)) then
+                if tName:find("filet") or (tName:find(lowerFishTarget) and tName:find(lowerRecipeTarget)) or tName == lowerRecipeTarget then
                     return true, tool.Name
                 end
             end
         end
-        -- Scan Hotbar/Backpack Slots
         for _, tool in ipairs(backpack:GetChildren()) do
             if tool:IsA("Tool") then
                 local tName = string.lower(tool.Name)
-                if tName:find("filet") or (tName:find(lowerFishTarget) and tName:find(lowerRecipeTarget)) then
-                    debugLog("[HOTBAR] Found exact matching item: " .. tool.Name)
+                if tName:find("filet") or (tName:find(lowerFishTarget) and tName:find(lowerRecipeTarget)) or tName == lowerRecipeTarget then
+                    debugLog("[HOTBAR SCANNER] Found valid tool in inventory: " .. tool.Name)
                     humanoid:EquipTool(tool)
-                    task.wait(0.3)
+                    task.wait(0.4)
                     return true, tool.Name
                 end
             end
@@ -390,30 +398,21 @@ local function Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, ta
     -- Pre-check: If you are already holding the correct combo, serve it immediately
     local alreadyHolding, existingToolName = tryEquipFoodTool()
     if alreadyHolding then
-        ServeFood(targetNPC.npc, existingToolName, targetSlot)
+        ServeFood(targetNPC.npc, targetRecipe, targetFish, targetSlot)
         return true
     end
     
     -- Fetch storage cabinet data
     local success, restaurantData = pcall(function() return RequestRestaurauntData:InvokeServer() end)
     if success and restaurantData then
-        debugLog("[STORAGE] Searching for: " .. lowerFishTarget .. " " .. lowerRecipeTarget)
-        local itemCount = 0
         for itemID, foodItem in pairs(restaurantData) do
-            if type(foodItem) == "table" and foodItem.CF and foodItem.Name then
-                itemCount = itemCount + 1
+            if type(foodItem) == "table" and foodItem.CF then
                 local internalFishName = string.gsub(string.lower(foodItem.CF), "_", " ")
-                local internalRecipeName = string.gsub(string.lower(foodItem.Name), "_", " ")
                 local amountValue = tonumber(foodItem.Amount) or 0
                 
-                -- Debug: Log first few items to see structure
-                if itemCount <= 5 then
-                    debugLog("[STORAGE] Item " .. tostring(itemID) .. ": CF=" .. foodItem.CF .. ", Name=" .. foodItem.Name .. ", Amount=" .. amountValue)
-                end
-                
-                -- Verify cabinet item matches BOTH fish species AND recipe type
-                if internalFishName == lowerFishTarget and internalRecipeName == lowerRecipeTarget and amountValue > 0 then
-                    debugLog("[STORAGE] Found " .. foodItem.CF .. " " .. foodItem.Name .. " (ID: " .. tostring(itemID) .. ") in cabinet")
+                -- Verify cabinet item matches fish species (recipe type is in EquipPlate payload)
+                if internalFishName == lowerFishTarget and amountValue > 0 then
+                    debugLog("[STORAGE] Found " .. foodItem.CF .. " in cabinet (ID: " .. tostring(itemID) .. ")")
                     
                     -- Form payload using strict network patterns from Remote Spy logs
                     local equipPayload = {
@@ -429,38 +428,14 @@ local function Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, ta
                         EquipPlate:FireServer(equipPayload)
                     end)
                     
-                    task.wait(1.0)
+                    task.wait(0.8) -- Slightly prolonged wait for secure backpack replication from Cabinet
                     
-                    -- Look for the precise tool in inventory with retry logic
                     local toolFound, physicalToolName = tryEquipFoodTool()
-                    local retryCount = 0
-                    while not toolFound and retryCount < 3 do
-                        retryCount = retryCount + 1
-                        debugLog("[INVENTORY] Retry " .. retryCount .. "/3: Tool not found, waiting 0.5s...")
-                        task.wait(0.5)
-                        toolFound, physicalToolName = tryEquipFoodTool()
-                    end
-                    
                     if toolFound then
-                        ServeFood(targetNPC.npc, physicalToolName, targetSlot)
+                        ServeFood(targetNPC.npc, targetRecipe, targetFish, targetSlot)
                     else
-                        -- Loosen matching for fallback - accept tools matching fish OR recipe
-                        debugLog("[INVENTORY] Strict match failed, trying loose match...")
-                        for _, tool in ipairs(backpack:GetChildren()) do
-                            if tool:IsA("Tool") then
-                                local tName = string.lower(tool.Name)
-                                if tName:find(lowerFishTarget) or tName:find(lowerRecipeTarget) then
-                                    debugLog("[INVENTORY] Found with loose match: " .. tool.Name)
-                                    humanoid:EquipTool(tool)
-                                    task.wait(0.3)
-                                    ServeFood(targetNPC.npc, tool.Name, targetSlot)
-                                    return true
-                                end
-                            end
-                        end
-                        -- Final fallback
-                        debugLog("[INVENTORY] Tool not found in backpack, using fallback")
-                        ServeFood(targetNPC.npc, targetRecipe, targetSlot)
+                        debugLog("[INVENTORY] Verification slow. Re-verifying inside execution block...")
+                        ServeFood(targetNPC.npc, targetRecipe, targetFish, targetSlot)
                     end
                     
                     return true -- Breaks execution immediately to avoid ghost cook triggers
@@ -474,16 +449,13 @@ local function Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, ta
         debugLog("[COOK] Cooking " .. targetRecipe .. " with " .. targetFish)
         local cookSuccess = pcall(function() return AutoCookModule.CookSingle(targetRecipe, targetFish) end)
         if cookSuccess then
+            debugLog("[COOK] Cook successful, waiting for dish to appear...")
             task.wait(2.2)
             local toolFound, physicalToolName = tryEquipFoodTool()
             if toolFound then
-                ServeFood(targetNPC.npc, physicalToolName, targetSlot)
+                ServeFood(targetNPC.npc, targetRecipe, targetFish, targetSlot)
                 return true
-            else
-                debugLog("[COOK] Dish not found after cooking")
             end
-        else
-            debugLog("[COOK] Failed to cook " .. targetRecipe .. " with " .. targetFish)
         end
     end
     
