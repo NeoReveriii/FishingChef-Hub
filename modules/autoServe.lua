@@ -563,12 +563,22 @@ function AutoServe.Start()
                     end
                 end
                 
-                -- PRIORITY 2: Normal Target Scanning (Runs if no VIP matches exist)
+                -- PRIORITY 2: Normal Target Scanning (Runs ONLY if no active VIP matches exist or target is not a VIP)
                 if not targetNPC and AutoServe.Config.ServeNormalNPCs then
                     for _, entry in ipairs(availableTargets) do
                         if not servedNPCsMemory[entry.data.npc] then
-                            -- NON-BLOCKING CONDITION: Skip walking customers instantly to evaluate other slots
-                            if IsNPCSeated(entry.data.npc) or IsAtCounter(entry.data.npc) then
+                            -- Check if this specific customer is actually a VIP to prevent normal override errors
+                            local identity = entry.data.identity or ""
+                            local isVipCustomer = false
+                            for _, vipName in ipairs(AVAILABLE_VIPS) do
+                                if identity:find(vipName) then
+                                    isVipCustomer = true
+                                    break
+                                end
+                            end
+
+                            -- Only process as normal customer if they are NOT a VIP
+                            if not isVipCustomer and (IsNPCSeated(entry.data.npc) or IsAtCounter(entry.data.npc)) then
                                 local requestedRecipe = GetNPCRequestedRecipe(entry.data.npc)
                                 if requestedRecipe and AutoServe.Config.NormalOrder[requestedRecipe] then
                                     targetNPC = entry.data; targetSlot = entry.id; targetRecipe = requestedRecipe
