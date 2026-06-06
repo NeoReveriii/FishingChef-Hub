@@ -358,34 +358,40 @@ local function Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, ta
     local backpack = LocalPlayer:WaitForChild("Backpack")
     local humanoid = character:WaitForChild("Humanoid")
     
-    local lowerFishTarget = string.gsub(string.lower(targetFish or ""), "_", " ")
-    local lowerRecipeTarget = string.lower(targetRecipe or "")
-    
     debugLog("[INVENTORY] Searching for: " .. targetFoodName .. " (Recipe: " .. targetRecipe .. ", Fish: " .. tostring(targetFish) .. ")")
     
-    -- Helper function to find and equip ANY food plate or filet tool in inventory
+    local lowerRecipeTarget = string.lower(targetRecipe or "")
+    local lowerFishTarget = string.gsub(string.lower(targetFish or ""), "_", " ")
+
+    -- FIX 1: Enhanced Broad Hotbar/Backpack Scanner
     local function tryEquipFoodTool()
-        -- Scan character space first
+        -- Look inside character hands first
         for _, tool in ipairs(character:GetChildren()) do
-            if tool:IsA("Tool") and (string.find(string.lower(tool.Name), "filet") or string.find(string.lower(tool.Name), lowerRecipeTarget)) then
-                return true, tool.Name
+            if tool:IsA("Tool") then
+                local tName = string.lower(tool.Name)
+                if tName:find("filet") or tName:find(lowerRecipeTarget) or tName:find(lowerFishTarget) then
+                    return true, tool.Name
+                end
             end
         end
-        -- Scan backpack storage
+        -- Look inside the hotbar/backpack slots
         for _, tool in ipairs(backpack:GetChildren()) do
-            if tool:IsA("Tool") and (string.find(string.lower(tool.Name), "filet") or string.find(string.lower(tool.Name), lowerRecipeTarget)) then
-                humanoid:EquipTool(tool)
-                task.wait(0.3)
-                return true, tool.Name
+            if tool:IsA("Tool") then
+                local tName = string.lower(tool.Name)
+                if tName:find("filet") or tName:find(lowerRecipeTarget) or tName:find(lowerFishTarget) then
+                    debugLog("[HOTBAR] Found and equipping item matching customer criteria: " .. tool.Name)
+                    humanoid:EquipTool(tool)
+                    task.wait(0.3)
+                    return true, tool.Name
+                end
             end
         end
         return false, nil
     end
     
-    -- Check if we are already holding an appropriate item
+    -- Fast pre-check: If you are already holding it, serve it instantly
     local alreadyHolding, existingToolName = tryEquipFoodTool()
     if alreadyHolding then
-        debugLog("[INVENTORY] Already holding: " .. existingToolName)
         ServeFood(targetNPC.npc, existingToolName, targetSlot)
         return true
     end
@@ -408,32 +414,34 @@ local function Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, ta
                 if internalFishName == lowerFishTarget and amountValue > 0 then
                     debugLog("[STORAGE] MATCH FOUND! Internal ID: " .. tostring(itemID) .. " | Variety: " .. internalFishName)
                     
-                    -- FIXED REMOTE CALL: Formatted exactly like Remote Spy data profile!
-                    local equipPayload = {
-                        CF = foodItem.CF,
-                        Name = targetRecipe, -- Synchronizes string key to expected type (e.g. "Sashimi", "Nigiri")
-                        Amount = 1,
-                        ID = itemID, -- Uses server row ID directly
-                        Data = foodItem.Data or 0,
-                        Value = foodItem.Value or 0
-                    }
-                    
+                    -- Fire remote payload matching manual Remote Spy syntax
                     pcall(function()
-                        EquipPlate:FireServer(equipPayload)
+                        EquipPlate:FireServer({
+                            CF = foodItem.CF,
+                            Name = targetRecipe, 
+                            Amount = 1,
+                            ID = itemID,
+                            Data = foodItem.Data or 0,
+                            Value = foodItem.Value or 0
+                        })
                     end)
                     
-                    -- Post-equip delay to allow the server time to replicate the physical tool asset
-                    task.wait(0.5)
+                    -- Server replication allowance delay
+                    task.wait(0.6)
                     
-                    -- Look for the fresh tool in inventory slots
+                    -- Look for the newly generated item inside your hotbar/backpack
                     local toolFound, physicalToolName = tryEquipFoodTool()
                     if toolFound then
                         debugLog("[INVENTORY] Tool equipped after storage pull: " .. physicalToolName)
                         ServeFood(targetNPC.npc, physicalToolName, targetSlot)
-                        return true
                     else
-                        debugLog("[INVENTORY] Server accepted EquipPlate payload but no physical tool was found in Backpack slots!")
+                        debugLog("[INVENTORY] Warning: Tool replication slow. Forcing direct fallback handoff.")
+                        -- Fallback assignment if replication lag occurs but we know the server accepted it
+                        ServeFood(targetNPC.npc, targetRecipe, targetSlot)
                     end
+                    
+                    -- FIX 2: EXITS FUNCTION INSTANTLY - Cuts off ghost loops from ever triggering autocook
+                    return true 
                 end
             end
         end
@@ -442,7 +450,7 @@ local function Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, ta
         debugLog("[INVENTORY] Failed to fetch restaurant storage data")
     end
     
-    -- Fallback Operation: Trigger cooking sequence if storage contains 0 plates
+    -- Fallback Operation: Trigger cooking sequence ONLY if storage contains 0 plates
     if targetFish and AutoCookModule then
         debugLog("[INVENTORY] Targeted item out of stock. Prompting AutoCook module for: " .. targetRecipe .. " (" .. targetFish .. ")")
         local cookSuccess = pcall(function() return AutoCookModule.CookSingle(targetRecipe, targetFish) end)
