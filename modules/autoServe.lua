@@ -519,29 +519,47 @@ function AutoServe.Start()
                 
                 -- PRIORITY 1: VIP Target Scanning
                 if AutoServe.Config.ServeSpecialGuests and #AutoServe.Config.SelectedVIPs > 0 then
+                    debugLog("[VIP] Checking for VIPs: " .. table.concat(AutoServe.Config.SelectedVIPs, ", "))
                     for _, entry in ipairs(availableTargets) do
                         if entry.data.identity and not servedNPCsMemory[entry.data.npc] then
+                            debugLog("[VIP] Found NPC: " .. entry.data.identity .. " at Slot " .. entry.id)
                             -- NON-BLOCKING CONDITION: Only target if they have safely arrived at their objective position
                             if IsNPCSeated(entry.data.npc) or IsAtCounter(entry.data.npc) then
+                                debugLog("[VIP] NPC is ready (seated/at counter)")
                                 for _, vipName in ipairs(AutoServe.Config.SelectedVIPs) do
                                     if entry.data.identity:find(vipName) then
                                         targetNPC = entry.data; targetSlot = entry.id
                                         local vipOrder = VIP_ORDERS[vipName]
+                                        if not vipOrder then
+                                            debugLog("[VIP] ERROR: No order found for " .. vipName)
+                                            break
+                                        end
                                         targetFoodName = vipOrder.displayName; targetRecipe = vipOrder.recipe
                                         -- Use dynamic fish for Rich Guy, hardcoded for other VIPs
                                         if vipName == "Rich Guy" then
                                             targetFish = AutoServe.Config.RichGuyFish
                                             targetFoodName = AutoServe.Config.RichGuyFish .. " Nigiri"
+                                            debugLog("[VIP] Targeting Rich Guy with fish: " .. targetFish)
                                         else
                                             targetFish = vipOrder.fish
+                                            debugLog("[VIP] Targeting " .. vipName .. " with fish: " .. targetFish)
                                         end
                                         debugLog("[VIP] Targeting " .. vipName .. " with " .. targetFoodName)
                                         break
                                     end
                                 end
+                            else
+                                debugLog("[VIP] NPC not ready yet (walking)")
+                            end
+                        else
+                            if entry.data.identity then
+                                debugLog("[VIP] NPC " .. entry.data.identity .. " already served, skipping")
                             end
                         end
                         if targetNPC then break end
+                    end
+                    if not targetNPC then
+                        debugLog("[VIP] No VIP targets found this cycle")
                     end
                 end
                 
