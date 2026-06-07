@@ -405,12 +405,19 @@ local function Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, ta
     
     -- Fetch storage cabinet data
     local success, restaurantData = pcall(function() return RequestRestaurauntData:InvokeServer() end)
+    debugLog("[STORAGE] Fetch result: success=" .. tostring(success) .. " data=" .. tostring(restaurantData ~= nil))
+    
     if success and restaurantData then
+        debugLog("[STORAGE] Scanning " .. tostring(#restaurantData) .. " items (or table) for " .. lowerFishTarget .. " " .. lowerRecipeTarget)
+        
         for itemID, foodItem in pairs(restaurantData) do
             if type(foodItem) == "table" and foodItem.CF then
                 local internalFishName = string.gsub(string.lower(foodItem.CF), "_", " ")
                 local itemName = string.lower(foodItem.Name or "")
                 local amountValue = tonumber(foodItem.Amount) or 0
+                
+                -- Debug: Log each item being scanned
+                debugLog("[STORAGE SCAN] Item: CF=" .. tostring(foodItem.CF) .. " Name=" .. tostring(foodItem.Name) .. " Amount=" .. tostring(amountValue))
                 
                 -- Verify cabinet item matches BOTH fish species AND recipe type (cooked dish check)
                 if internalFishName == lowerFishTarget and itemName:find(lowerRecipeTarget) and amountValue > 0 then
