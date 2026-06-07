@@ -384,6 +384,7 @@ local function Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, ta
         for _, tool in ipairs(backpack:GetChildren()) do
             if tool:IsA("Tool") then
                 local tName = string.lower(tool.Name)
+                debugLog("[TOOL SCAN] Checking tool: " .. tool.Name .. " against fish=" .. lowerFishTarget .. " recipe=" .. lowerRecipeTarget)
                 if tName:find("filet") or (tName:find(lowerFishTarget) and tName:find(lowerRecipeTarget)) or tName == lowerRecipeTarget then
                     debugLog("[HOTBAR SCANNER] Found valid tool in inventory: " .. tool.Name)
                     humanoid:EquipTool(tool)
@@ -408,21 +409,24 @@ local function Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, ta
         for itemID, foodItem in pairs(restaurantData) do
             if type(foodItem) == "table" and foodItem.CF then
                 local internalFishName = string.gsub(string.lower(foodItem.CF), "_", " ")
+                local itemName = string.lower(foodItem.Name or "")
                 local amountValue = tonumber(foodItem.Amount) or 0
                 
-                -- Verify cabinet item matches fish species (recipe type is in EquipPlate payload)
-                if internalFishName == lowerFishTarget and amountValue > 0 then
-                    debugLog("[STORAGE] Found " .. foodItem.CF .. " in cabinet (ID: " .. tostring(itemID) .. ")")
+                -- Verify cabinet item matches BOTH fish species AND recipe type (cooked dish check)
+                if internalFishName == lowerFishTarget and itemName:find(lowerRecipeTarget) and amountValue > 0 then
+                    debugLog("[STORAGE] Found " .. foodItem.CF .. " " .. foodItem.Name .. " in cabinet (ID: " .. tostring(itemID) .. ")")
                     
                     -- Form payload using strict network patterns from Remote Spy logs
                     local equipPayload = {
                         CF = foodItem.CF,
-                        Name = targetRecipe, -- Sends exact requested text: "Sushi", "Sashimi", or "Nigiri"
+                        Name = foodItem.Name, -- Uses exact recipe name from storage ("Sushi", "Nigiri", "Sashimi")
                         Amount = 1,
                         ID = foodItem.ID or itemID, -- Uses server "PXX" tracking keys
                         Data = foodItem.Data or 0,
                         Value = foodItem.Value or 0
                     }
+                    
+                    debugLog("[EQUIP] Firing EquipPlate with: CF=" .. tostring(foodItem.CF) .. " Name=" .. tostring(foodItem.Name) .. " ID=" .. tostring(foodItem.ID or itemID))
                     
                     pcall(function()
                         EquipPlate:FireServer(equipPayload)
