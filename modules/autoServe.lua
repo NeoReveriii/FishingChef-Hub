@@ -397,13 +397,16 @@ local function Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, ta
     end
     
     -- Pre-check: If you are already holding the correct combo, serve it immediately
+    debugLog("[PHASE2] Starting tool pre-check...")
     local alreadyHolding, existingToolName = tryEquipFoodTool()
+    debugLog("[PHASE2] Tool check result: " .. tostring(alreadyHolding))
     if alreadyHolding then
         ServeFood(targetNPC.npc, targetRecipe, targetFish, targetSlot)
         return true
     end
     
     -- Fetch storage cabinet data
+    debugLog("[PHASE2] Fetching storage data...")
     local success, restaurantData = pcall(function() return RequestRestaurauntData:InvokeServer() end)
     debugLog("[STORAGE] Fetch result: success=" .. tostring(success) .. " data=" .. tostring(restaurantData ~= nil))
     
