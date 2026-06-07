@@ -4,12 +4,14 @@ local Teleport = {}
 Teleport.Locations = {
     ["Koi Pond"] = Vector3.new(-131.915, 3.858, -1308.048),
     ["Razor Reef"] = Vector3.new(-1444.871, 0.7, 1559.375),
-    ["Bamboo Forest"] = Vector3.new(-2357.901, 0.803, -928.84)
+    ["Bamboo Forest"] = Vector3.new(-2357.901, 0.803, -928.84),
+    ["Moon Tuna"] = Vector3.new(-212, 6, -845),
+    ["Moon Tuna Hidden"] = Vector3.new(-199, 11, -837)
 }
 
 -- Return an ordered list of location names for dropdowns
 function Teleport.GetLocationNames()
-    return {"Koi Pond", "Razor Reef", "Bamboo Forest"}
+    return {"Koi Pond", "Razor Reef", "Bamboo Forest", "Moon Tuna", "Moon Tuna Hidden"}
 end
 
 -- Teleport logic execution
