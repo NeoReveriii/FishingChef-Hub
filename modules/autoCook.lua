@@ -314,16 +314,21 @@ function AutoCook.Start()
                         -- Legendary cut values: ~4.2+ gives legendary cut quality
                         if AutoCook.SelectedRecipe == "Nigiri" or AutoCook.SelectedRecipe == "Sushi" then
                             -- Nigiri and Sushi require 2 cuts - always legendary
+                            print("[DEBUG] CutAction 1 timing: 4.224825059063733")
                             CutAction:FireServer(1, 4.224825059063733)
                             task.wait(0.1)
+                            print("[DEBUG] CutAction 2 timing: 2.8620318612083793")
                             CutAction:FireServer(2, 2.8620318612083793)
                             task.wait(0.2)
                         else
                             -- Sashimi requires 3 cuts - always legendary
+                            print("[DEBUG] CutAction 1 timing: 4.5")
                             CutAction:FireServer(1, 4.5)
                             task.wait(0.1)
+                            print("[DEBUG] CutAction 2 timing: 4.6")
                             CutAction:FireServer(2, 4.6)
                             task.wait(0.1)
+                            print("[DEBUG] CutAction 3 timing: 4.7")
                             CutAction:FireServer(3, 4.7)
                             task.wait(0.2)
                         end
@@ -343,6 +348,7 @@ function AutoCook.Start()
                         -- 3.5: Cut Fish
                         local fishIdOrWeight = targetFishItem.ID or 1767
                         local floatVal = 1.8703127691005004 
+                        print("[DEBUG] CutFish - Fish ID: " .. tostring(fishIdOrWeight) .. ", Multiplier: " .. tostring(floatVal))
                         CutFish:InvokeServer(fishIdOrWeight, floatVal)
                         task.wait(0.2)
                         
@@ -361,6 +367,7 @@ function AutoCook.Start()
                             Mutations = targetFishItem.Mutations or {} -- Include mutations (Wet, Moonlit, Cosmic)
                         }
                         
+                        print("[DEBUG] Cook Payload - Recipe: " .. tostring(AutoCook.SelectedRecipe) .. ", Fish: " .. tostring(cookPayload.CF) .. ", Fish ID: " .. tostring(cookPayload.ID) .. ", Data: " .. tostring(cookPayload.Data) .. ", Mutations: " .. table.concat(cookPayload.Mutations or {}, ", ") .. ", Multiplier: " .. tostring(floatVal))
                         Cook:InvokeServer(AutoCook.SelectedRecipe, cookPayload, floatVal)
                         print("[AutoCook]: Successfully cooked " .. tostring(AutoCook.SelectedRecipe) .. "!")
                         
