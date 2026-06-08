@@ -148,9 +148,8 @@ function AutoCook.CookSingleWithMutations(recipe, fishName, requiredMutations)
         task.wait(0.2)
         
         -- Cut Actions - Different sequence for Nigiri/Sushi (2 cuts) vs Sashimi (3 cuts)
-        -- Legendary cut values: ~4.2+ gives legendary cut quality
         if recipe == "Nigiri" or recipe == "Sushi" then
-            CutAction:FireServer(1, 4.5)
+            CutAction:FireServer(1, 4.224825059063733)
             task.wait(0.1)
             CutAction:FireServer(2, 4.6)
             task.wait(0.2)
@@ -315,9 +314,9 @@ function AutoCook.Start()
                         -- Legendary cut values: ~4.2+ gives legendary cut quality
                         if AutoCook.SelectedRecipe == "Nigiri" or AutoCook.SelectedRecipe == "Sushi" then
                             -- Nigiri and Sushi require 2 cuts - always legendary
-                            CutAction:FireServer(1, 4.5)
+                            CutAction:FireServer(1, 4.224825059063733)
                             task.wait(0.1)
-                            CutAction:FireServer(2, 4.6)
+                            CutAction:FireServer(2, 2.8620318612083793)
                             task.wait(0.2)
                         else
                             -- Sashimi requires 3 cuts - always legendary
@@ -343,7 +342,7 @@ function AutoCook.Start()
                         
                         -- 3.5: Cut Fish
                         local fishIdOrWeight = targetFishItem.ID or 1767
-                        local floatVal = 4.339033467350943 
+                        local floatVal = 1.8703127691005004 
                         CutFish:InvokeServer(fishIdOrWeight, floatVal)
                         task.wait(0.2)
                         
