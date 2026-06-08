@@ -229,15 +229,6 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Modul
         end
     end)
     
-    UI_Module.AddSectionLabel(TeleportPage, "MOON TUNA EVENT")
-    
-    UI_Module.AddToggle(TeleportPage, "Auto Teleport (Moon Tuna Event)", function(state)
-        if state then
-            Teleport_Module.EnableMoonTunaAutoTeleport()
-        else
-            Teleport_Module.DisableMoonTunaAutoTeleport()
-        end
-    end)
     
     -------------------------------------------
     -- TAB 4: Auto Fishing
