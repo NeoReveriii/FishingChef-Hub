@@ -170,9 +170,10 @@ function AutoSell.SellNow()
         -- Item must match both fish selection AND rarity selection
         if fishMatch and rarityMatch then
             table.insert(batch, {
-                ID     = item.ID,
-                Name   = fishName,
-                Weight = item.Weight or 1
+                ID        = item.ID,
+                Name      = fishName,
+                Weight    = item.Weight or 1,
+                Mutations = item.Mutations or {} -- Include mutations (Wet, Moonlit, Cosmic)
             })
         end
     end

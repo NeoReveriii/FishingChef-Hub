@@ -52,6 +52,12 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Modul
         print("[State]: Set target species to -> " .. table.concat(choices, ", "))
     end)
     
+    -- Mutation filter dropdown (multi-select)
+    UI_Module.AddDropdown(CookPage, "Target Mutations", {"Wet", "Moonlit", "Cosmic"}, true, function(choices)
+        Logic_Module.SelectedMutations = choices
+        print("[State]: Set target mutations to -> " .. table.concat(choices, ", "))
+    end)
+    
     local RefreshBtn = Instance.new("TextButton", CookPage)
     RefreshBtn.Size = UDim2.new(0.95, 0, 0, 30)
     RefreshBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
@@ -89,6 +95,7 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Modul
     ClearBtn.MouseButton1Click:Connect(function()
         Logic_Module.SelectedRecipe = "Sashimi"
         Logic_Module.SelectedFishes = {}
+        Logic_Module.SelectedMutations = {}
         local available = Logic_Module.GetAvailableFish()
         if #available == 0 then available = {"No Fish Found"} end
         dropdownController.Refresh(available)
@@ -278,6 +285,12 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Modul
         print("[AutoServe]: Sashimi Fish -> " .. choice)
     end)
     
+    -- Sashimi Mutations Dropdown
+    local sashimiMutationsDropdown = UI_Module.AddDropdown(ServePage, "Sashimi Mutations", {"Wet", "Moonlit", "Cosmic"}, true, function(choices)
+        Serve_Module.Config.NormalOrder.Sashimi.Mutations = choices
+        print("[AutoServe]: Sashimi Mutations -> " .. table.concat(choices, ", "))
+    end)
+    
     -- Nigiri Fish Dropdown
     local nigiriFishDropdown = UI_Module.AddDropdown(ServePage, "Nigiri Fish", {"Loading..."}, false, function(choice)
         Serve_Module.Config.NormalOrder.Nigiri.Fish = choice
@@ -285,11 +298,23 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Modul
         print("[AutoServe]: Nigiri Fish -> " .. choice)
     end)
     
+    -- Nigiri Mutations Dropdown
+    local nigiriMutationsDropdown = UI_Module.AddDropdown(ServePage, "Nigiri Mutations", {"Wet", "Moonlit", "Cosmic"}, true, function(choices)
+        Serve_Module.Config.NormalOrder.Nigiri.Mutations = choices
+        print("[AutoServe]: Nigiri Mutations -> " .. table.concat(choices, ", "))
+    end)
+    
     -- Sushi Fish Dropdown
     local sushiFishDropdown = UI_Module.AddDropdown(ServePage, "Sushi Fish", {"Loading..."}, false, function(choice)
         Serve_Module.Config.NormalOrder.Sushi.Fish = choice
         Serve_Module.Config.NormalOrder.Sushi.DisplayName = choice .. " Sushi"
         print("[AutoServe]: Sushi Fish -> " .. choice)
+    end)
+    
+    -- Sushi Mutations Dropdown
+    local sushiMutationsDropdown = UI_Module.AddDropdown(ServePage, "Sushi Mutations", {"Wet", "Moonlit", "Cosmic"}, true, function(choices)
+        Serve_Module.Config.NormalOrder.Sushi.Mutations = choices
+        print("[AutoServe]: Sushi Mutations -> " .. table.concat(choices, ", "))
     end)
     
     UI_Module.AddSectionLabel(ServePage, "VIP TARGETING")
@@ -303,6 +328,12 @@ if UI_Module and Logic_Module and Teleport_Module and Fish_Module and Sell_Modul
     local richGuyFishDropdown = UI_Module.AddDropdown(ServePage, "Rich Guy Fish (Nigiri)", {"Loading..."}, false, function(choice)
         Serve_Module.Config.RichGuyFish = choice
         print("[AutoServe]: Rich Guy Fish -> " .. choice)
+    end)
+    
+    -- Rich Guy Mutations Dropdown
+    local richGuyMutationsDropdown = UI_Module.AddDropdown(ServePage, "Rich Guy Mutations", {"Wet", "Moonlit", "Cosmic"}, true, function(choices)
+        Serve_Module.Config.RichGuyMutations = choices
+        print("[AutoServe]: Rich Guy Mutations -> " .. table.concat(choices, ", "))
     end)
     
     -- Refresh fish list button

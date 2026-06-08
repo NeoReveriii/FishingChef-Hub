@@ -14,20 +14,24 @@ AutoServe.Config = {
     ServeSpecialGuests = false,
     SelectedVIPs = {}, -- Array of selected VIP names
     RichGuyFish = "salmon", -- Dynamic fish selection for Rich Guy (accepts any fish)
+    RichGuyMutations = {}, -- Mutations for Rich Guy fish
     
     -- Normal NPC Order Configuration - separate fish for each recipe
     NormalOrder = {
         Sashimi = {
             Fish = "salmon",
-            DisplayName = "Salmon Sashimi"
+            DisplayName = "Salmon Sashimi",
+            Mutations = {} -- Mutations for Sashimi fish
         },
         Nigiri = {
             Fish = "tuna",
-            DisplayName = "Tuna Nigiri"
+            DisplayName = "Tuna Nigiri",
+            Mutations = {} -- Mutations for Nigiri fish
         },
         Sushi = {
             Fish = "shrimp",
-            DisplayName = "Shrimp Sushi"
+            DisplayName = "Shrimp Sushi",
+            Mutations = {} -- Mutations for Sushi fish
         }
     }
 }
@@ -361,7 +365,7 @@ local function Phase1_RadarDetection()
 end
 
 -- Phase 2: Smart Fulfillment & Targeted Cooking Chain
-local function Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, targetRecipe, targetFish, EquipPlate, RequestRestaurauntData, AutoCookModule)
+local function Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, targetRecipe, targetFish, targetMutations, EquipPlate, RequestRestaurauntData, AutoCookModule)
     local Players = game:GetService("Players")
     local LocalPlayer = Players.LocalPlayer
     local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
@@ -460,8 +464,8 @@ local function Phase2_SmartFulfillment(targetNPC, targetFoodName, targetSlot, ta
     
     -- Fallback Operation: Trigger cooking sequence ONLY if storage contains 0 plates
     if targetFish and AutoCookModule then
-        debugLog("[COOK] Cooking " .. targetRecipe .. " with " .. targetFish)
-        local cookSuccess = pcall(function() return AutoCookModule.CookSingle(targetRecipe, targetFish) end)
+        debugLog("[COOK] Cooking " .. targetRecipe .. " with " .. targetFish .. " mutations: " .. table.concat(targetMutations or {}, ","))
+        local cookSuccess = pcall(function() return AutoCookModule.CookSingleWithMutations(targetRecipe, targetFish, targetMutations or {}) end)
         if cookSuccess then
             debugLog("[COOK] Cook successful, waiting for dish to appear...")
             task.wait(2.2)
@@ -525,6 +529,7 @@ function AutoServe.Start()
                 local targetFoodName = nil
                 local targetRecipe = nil
                 local targetFish = nil
+                local targetMutations = {}
                 
                 -- Check Slots Independently (Prevents Slot 1 from paralyzing Slot 2 operations)
                 local availableTargets = {}
@@ -553,9 +558,11 @@ function AutoServe.Start()
                                         if vipName == "Rich Guy" then
                                             targetFish = AutoServe.Config.RichGuyFish
                                             targetFoodName = AutoServe.Config.RichGuyFish .. " Nigiri"
-                                            debugLog("[VIP] Targeting Rich Guy with fish: " .. targetFish)
+                                            targetMutations = AutoServe.Config.RichGuyMutations or {}
+                                            debugLog("[VIP] Targeting Rich Guy with fish: " .. targetFish .. " mutations: " .. table.concat(targetMutations, ","))
                                         else
                                             targetFish = vipOrder.fish
+                                            targetMutations = {}
                                             debugLog("[VIP] Targeting " .. vipName .. " with fish: " .. targetFish)
                                         end
                                         debugLog("[VIP] Targeting " .. vipName .. " with " .. targetFoodName)
@@ -598,7 +605,8 @@ function AutoServe.Start()
                                     targetNPC = entry.data; targetSlot = entry.id; targetRecipe = requestedRecipe
                                     targetFish = AutoServe.Config.NormalOrder[requestedRecipe].Fish
                                     targetFoodName = AutoServe.Config.NormalOrder[requestedRecipe].DisplayName
-                                    debugLog("[NORMAL] Targeting NPC with " .. targetFoodName)
+                                    targetMutations = AutoServe.Config.NormalOrder[requestedRecipe].Mutations or {}
+                                    debugLog("[NORMAL] Targeting NPC with " .. targetFoodName .. " mutations: " .. table.concat(targetMutations, ","))
                                     break
                                 end
                             end
@@ -639,7 +647,7 @@ function AutoServe.Start()
                     debugLog("[TARGETING] Processing " .. targetNPC.identity .. " at Slot " .. targetSlot)
                     
                     local served = Phase2_SmartFulfillment(
-                        targetNPC, targetFoodName, targetSlot, targetRecipe, targetFish, 
+                        targetNPC, targetFoodName, targetSlot, targetRecipe, targetFish, targetMutations,
                         EquipPlate, RequestRestaurauntData, AutoServe.AutoCookModule
                     )
                     

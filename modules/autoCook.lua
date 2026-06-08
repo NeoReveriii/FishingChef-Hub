@@ -5,6 +5,7 @@ local loopThread = nil
 AutoCook.Enabled = false
 AutoCook.SelectedFishes = {} -- Array of target fish for processing
 AutoCook.SelectedRecipe = "Sashimi" -- Default selected recipe
+AutoCook.SelectedMutations = {} -- Array of target mutations (Wet, Moonlit, Cosmic) - empty = any
 
 -- 🛠️ Request inventory directly to generate our dynamic UI dropdown
 function AutoCook.GetAvailableFish()
@@ -48,6 +49,11 @@ end
 
 -- Single Cook Function - Cooks one fish with specific recipe (for use by other modules)
 function AutoCook.CookSingle(recipe, fishName)
+    return AutoCook.CookSingleWithMutations(recipe, fishName, {})
+end
+
+-- Single Cook Function with Mutations - Cooks one fish with specific recipe and mutations
+function AutoCook.CookSingleWithMutations(recipe, fishName, requiredMutations)
     local ReplicatedStorage = game:GetService("ReplicatedStorage")
     local Players = game:GetService("Players")
     local LocalPlayer = Players.LocalPlayer
@@ -91,18 +97,44 @@ function AutoCook.CookSingle(recipe, fishName)
         return false
     end
     
-    -- Find the specific fish in inventory
+    -- Find the specific fish in inventory with matching mutations
     local targetFishItem = nil
     for _, item in pairs(inventory) do
         local itemName = item.CF or item.Name
         if string.lower(itemName):find(string.lower(fishName)) then
-            targetFishItem = item
-            break
+            -- Check mutations if required
+            local mutationMatch = true
+            if requiredMutations and #requiredMutations > 0 then
+                local itemMutations = item.Mutations or {}
+                mutationMatch = false
+                -- Check if fish has ALL required mutations
+                local allMutationsFound = true
+                for _, reqMutation in ipairs(requiredMutations) do
+                    local hasMutation = false
+                    for _, itemMutation in ipairs(itemMutations) do
+                        if string.lower(itemMutation) == string.lower(reqMutation) then
+                            hasMutation = true
+                            break
+                        end
+                    end
+                    if not hasMutation then
+                        allMutationsFound = false
+                        break -- Missing a required mutation
+                    end
+                end
+                mutationMatch = allMutationsFound
+            end
+            
+            if mutationMatch then
+                targetFishItem = item
+                break
+            end
         end
     end
     
     if not targetFishItem then
-        warn("[AutoCook]: Could not find fish: " .. fishName)
+        local mutationStr = #requiredMutations > 0 and (" with mutations: " .. table.concat(requiredMutations, ", ")) or ""
+        warn("[AutoCook]: Could not find fish: " .. fishName .. mutationStr)
         return false
     end
     
@@ -116,17 +148,18 @@ function AutoCook.CookSingle(recipe, fishName)
         task.wait(0.2)
         
         -- Cut Actions - Different sequence for Nigiri/Sushi (2 cuts) vs Sashimi (3 cuts)
+        -- Legendary cut values: ~4.2+ gives legendary cut quality
         if recipe == "Nigiri" or recipe == "Sushi" then
-            CutAction:FireServer(1)
+            CutAction:FireServer(1, 4.5)
             task.wait(0.1)
-            CutAction:FireServer(2)
+            CutAction:FireServer(2, 4.6)
             task.wait(0.2)
         else
-            CutAction:FireServer(1)
+            CutAction:FireServer(1, 4.5)
             task.wait(0.1)
-            CutAction:FireServer(2)
+            CutAction:FireServer(2, 4.6)
             task.wait(0.1)
-            CutAction:FireServer(3)
+            CutAction:FireServer(3, 4.7)
             task.wait(0.2)
         end
         
@@ -151,14 +184,15 @@ function AutoCook.CookSingle(recipe, fishName)
         RequestRestaurantData:InvokeServer()
         task.wait(0.2)
         
-        -- Cook Process
+        -- Cook Process - Include Mutations if present
         local cookPayload = {
             CF = targetFishItem.CF or fishName,
             Name = "Fish Filet",
             Amount = 1,
             ID = targetFishItem.ID or 15,
             Data = (recipe == "Nigiri" or recipe == "Sushi") and 4 or 5,
-            Value = 0
+            Value = 0,
+            Mutations = targetFishItem.Mutations or {} -- Include mutations (Wet, Moonlit, Cosmic)
         }
         
         Cook:InvokeServer(recipe, cookPayload, floatVal)
@@ -230,10 +264,35 @@ function AutoCook.Start()
                         local matchFound = false
                         for _, fishTarget in ipairs(AutoCook.SelectedFishes) do
                             if (item.CF and string.lower(item.CF) == string.lower(fishTarget)) or (item.Name and string.lower(item.Name) == string.lower(fishTarget)) then
-                                targetFishItem = item
-                                targetFishName = fishTarget
-                                matchFound = true
-                                break
+                                -- Check mutation filter if set
+                                local mutationMatch = true
+                                if #AutoCook.SelectedMutations > 0 then
+                                    local itemMutations = item.Mutations or {}
+                                    mutationMatch = false
+                                    -- Check if fish has ALL selected mutations
+                                    local allMutationsFound = true
+                                    for _, reqMutation in ipairs(AutoCook.SelectedMutations) do
+                                        local hasMutation = false
+                                        for _, itemMutation in ipairs(itemMutations) do
+                                            if string.lower(itemMutation) == string.lower(reqMutation) then
+                                                hasMutation = true
+                                                break
+                                            end
+                                        end
+                                        if not hasMutation then
+                                            allMutationsFound = false
+                                            break -- Missing a required mutation
+                                        end
+                                    end
+                                    mutationMatch = allMutationsFound
+                                end
+                                
+                                if mutationMatch then
+                                    targetFishItem = item
+                                    targetFishName = fishTarget
+                                    matchFound = true
+                                    break
+                                end
                             end
                         end
                         if matchFound then break end
@@ -253,19 +312,20 @@ function AutoCook.Start()
                         task.wait(0.2)
                         
                         -- 3.3: Cut Actions - Different sequence for Nigiri/Sushi (2 cuts) vs Sashimi (3 cuts)
+                        -- Legendary cut values: ~4.2+ gives legendary cut quality
                         if AutoCook.SelectedRecipe == "Nigiri" or AutoCook.SelectedRecipe == "Sushi" then
-                            -- Nigiri and Sushi require 2 cuts
-                            CutAction:FireServer(1)
+                            -- Nigiri and Sushi require 2 cuts - always legendary
+                            CutAction:FireServer(1, 4.5)
                             task.wait(0.1)
-                            CutAction:FireServer(2)
+                            CutAction:FireServer(2, 4.6)
                             task.wait(0.2)
                         else
-                            -- Sashimi requires 3 cuts
-                            CutAction:FireServer(1)
+                            -- Sashimi requires 3 cuts - always legendary
+                            CutAction:FireServer(1, 4.5)
                             task.wait(0.1)
-                            CutAction:FireServer(2)
+                            CutAction:FireServer(2, 4.6)
                             task.wait(0.1)
-                            CutAction:FireServer(3)
+                            CutAction:FireServer(3, 4.7)
                             task.wait(0.2)
                         end
                         
@@ -291,14 +351,15 @@ function AutoCook.Start()
                         RequestRestaurantData:InvokeServer()
                         task.wait(0.2)
                         
-                        -- 3.7: Cook Process
+                        -- 3.7: Cook Process - Include Mutations if present
                         local cookPayload = {
                             CF = targetFishItem.CF or targetFishName,
                             Name = "Fish Filet",
                             Amount = 1,
                             ID = targetFishItem.ID or 15,
                             Data = (AutoCook.SelectedRecipe == "Nigiri" or AutoCook.SelectedRecipe == "Sushi") and 4 or 5, -- 4 for Nigiri/Sushi, 5 for Sashimi
-                            Value = 0
+                            Value = 0,
+                            Mutations = targetFishItem.Mutations or {} -- Include mutations (Wet, Moonlit, Cosmic)
                         }
                         
                         Cook:InvokeServer(AutoCook.SelectedRecipe, cookPayload, floatVal)
