@@ -318,7 +318,7 @@ function AutoCook.Start()
                             CutAction:FireServer(1, 4.224825059063733)
                             task.wait(0.1)
                             print("[DEBUG] CutAction 2 timing: 2.8620318612083793")
-                            CutAction:FireServer(2, 2.8620318612083793)
+                            CutAction:FireServer(2, 4.324825059063733)
                             task.wait(0.2)
                         else
                             -- Sashimi requires 3 cuts - always legendary
