@@ -37,6 +37,7 @@ end
 Teleport.MoonTunaEnabled = false
 Teleport.SavedPosition = nil
 Teleport.EventConnections = {}
+Teleport.MoonTunaActive = false -- Track if event is currently active
 
 function Teleport.EnableMoonTunaAutoTeleport()
     if Teleport.MoonTunaEnabled then return end
@@ -58,7 +59,11 @@ function Teleport.EnableMoonTunaAutoTeleport()
     -- Event Started Handler
     if EventStarted then
         local conn = EventStarted.OnClientEvent:Connect(function(eventParam)
-            print(string.format("[MoonTuna] 🚨 EVENT STARTED: %s", tostring(eventParam)))
+            -- Only trigger if not already active (prevents duplicate fires)
+            if Teleport.MoonTunaActive then return end
+            Teleport.MoonTunaActive = true
+            
+            print("[MoonTuna] 🚨 EVENT STARTED: " .. tostring(eventParam))
             
             -- Save current position before teleporting
             if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
@@ -89,7 +94,11 @@ function Teleport.EnableMoonTunaAutoTeleport()
     -- Event Ended Handler
     if EventEnded then
         local conn = EventEnded.OnClientEvent:Connect(function(eventParam)
-            print(string.format("[MoonTuna] 🛑 EVENT ENDED: %s", tostring(eventParam)))
+            -- Only trigger if event was active
+            if not Teleport.MoonTunaActive then return end
+            Teleport.MoonTunaActive = false
+            
+            print("[MoonTuna] 🛑 EVENT ENDED: " .. tostring(eventParam))
             
             -- Return to saved position
             if Teleport.SavedPosition then
@@ -122,6 +131,7 @@ end
 
 function Teleport.DisableMoonTunaAutoTeleport()
     Teleport.MoonTunaEnabled = false
+    Teleport.MoonTunaActive = false
     Teleport.SavedPosition = nil
     
     -- Disconnect all event listeners
