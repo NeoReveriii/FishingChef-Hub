@@ -176,7 +176,7 @@ function AutoCook.CookSingleWithMutations(recipe, fishName, requiredMutations)
         
         -- Cut Fish
         local fishIdOrWeight = targetFishItem.ID or 1767
-        local floatVal = 9.339033467350943 
+        local floatVal = 1.8558929952683516 
         CutFish:InvokeServer(fishIdOrWeight, floatVal)
         task.wait(0.2)
         
@@ -343,7 +343,7 @@ function AutoCook.Start()
                         
                         -- 3.5: Cut Fish
                         local fishIdOrWeight = targetFishItem.ID or 1767
-                        local floatVal = 9.339033467350943 
+                        local floatVal = 4.339033467350943 
                         CutFish:InvokeServer(fishIdOrWeight, floatVal)
                         task.wait(0.2)
                         
